@@ -204,9 +204,10 @@ def analyze_door_for_salto(image_paths: List[str]) -> DoorProfile:
                 },
             ],
             format=DoorProfile.model_json_schema(),
-            options={
-                "temperature": 0.0,
-                "num_ctx": 8192,
+           options={
+    "temperature": 0.0,
+    "num_ctx": 4096,
+},
             },
             keep_alive="30m",
         )
