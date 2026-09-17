@@ -93,6 +93,13 @@ interface CardOption {
   desc: string;
 }
 
+export interface DoorPhotoPreview {
+  file: File;
+  url: string;
+  name: string;
+  sizeFormatted: string;
+}
+
 @Component({
   selector: 'app-wizard',
   standalone: true,
@@ -123,6 +130,23 @@ export class WizardComponent
 
   @ViewChild('fileInput')
   private fileInput?: ElementRef<HTMLInputElement>;
+
+  @ViewChild('cameraInput')
+  private cameraInput?: ElementRef<HTMLInputElement>;
+
+  @ViewChild('cameraVideo')
+  private cameraVideo?: ElementRef<HTMLVideoElement>;
+
+  filePreviews: DoorPhotoPreview[] = [];
+
+  // Live in-app camera modal states
+  isCameraOpen = false;
+  isCameraLoading = false;
+  cameraError = '';
+  cameraStream: MediaStream | null = null;
+  availableCameras: MediaDeviceInfo[] = [];
+  selectedCameraIndex = 0;
+  isShutterFlashing = false;
 
   constructor(
     private readonly arSession: ArSessionService,
@@ -501,6 +525,7 @@ export class WizardComponent
   get recommendationResults(): DoorVisionRecommendation[] {
     return (
       this.analysisResult?.recommendations ??
+      this.doorVision.getLastResult()?.recommendations ??
       []
     );
   }
@@ -636,54 +661,205 @@ export class WizardComponent
     this.fileInput?.nativeElement.click();
   }
 
-  onFilesSelected(
-    event: Event,
-  ): void {
-    const input =
-      event.target as HTMLInputElement;
+  private formatFileSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
 
-    const files =
-      Array.from(input.files ?? []);
-
+  addFiles(files: File[]): void {
     this.scanError = '';
+    const imageFiles = files.filter(f => f.type.startsWith('image/'));
 
-    if (!files.length) {
+    if (imageFiles.length !== files.length) {
+      this.scanError = 'Only image files (JPG, PNG, WebP) can be uploaded.';
       return;
     }
 
-    const imageFiles =
-      files.filter(file =>
-        file.type.startsWith('image/'),
-      );
-
-    if (
-      imageFiles.length !==
-      files.length
-    ) {
-      this.scanError =
-        'Only image files can be uploaded.';
-
-      input.value = '';
+    const availableSlots = 5 - this.filePreviews.length;
+    if (availableSlots <= 0) {
+      this.scanError = 'Maximum 5 photos reached. Remove a photo to add a new one.';
       return;
     }
 
-    if (
-      imageFiles.length < 1 ||
-      imageFiles.length > 5
-    ) {
-      this.scanError =
-        'Please select between 1 and 5 door images.';
-
-      input.value = '';
-      return;
+    if (imageFiles.length > availableSlots) {
+      this.scanError = `You can select up to 5 photos. Only the first ${availableSlots} ${availableSlots === 1 ? 'was' : 'were'} added.`;
     }
 
-    this.selectedFiles =
-      imageFiles;
+    const toAdd = imageFiles.slice(0, availableSlots);
+    for (const file of toAdd) {
+      const url = URL.createObjectURL(file);
+      this.filePreviews.push({
+        file,
+        url,
+        name: file.name,
+        sizeFormatted: this.formatFileSize(file.size),
+      });
+    }
 
+    this.selectedFiles = this.filePreviews.map(p => p.file);
     if (this.selectedFiles.length > 0) {
       this.arSession.setDoorImage(this.selectedFiles[0]);
     }
+  }
+
+  onFilesSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files ?? []);
+    if (files.length) {
+      this.addFiles(files);
+    }
+    input.value = '';
+  }
+
+  onDropFiles(event: DragEvent): void {
+    event.preventDefault();
+    const files = Array.from(event.dataTransfer?.files ?? []);
+    if (files.length) {
+      this.addFiles(files);
+    }
+  }
+
+  removePhoto(index: number, event?: Event): void {
+    if (event) {
+      event.stopPropagation();
+    }
+    if (index >= 0 && index < this.filePreviews.length) {
+      URL.revokeObjectURL(this.filePreviews[index].url);
+      this.filePreviews.splice(index, 1);
+      this.selectedFiles = this.filePreviews.map(p => p.file);
+      if (this.selectedFiles.length > 0) {
+        this.arSession.setDoorImage(this.selectedFiles[0]);
+      }
+      this.scanError = '';
+    }
+  }
+
+  clearAllPhotos(): void {
+    this.filePreviews.forEach(p => URL.revokeObjectURL(p.url));
+    this.filePreviews = [];
+    this.selectedFiles = [];
+    this.scanError = '';
+  }
+
+  async openCamera(): Promise<void> {
+    if (this.filePreviews.length >= 5) {
+      this.scanError = 'Maximum 5 photos already added. Remove a photo to take a new one.';
+      return;
+    }
+
+    const hasGetUserMedia = typeof navigator !== 'undefined' &&
+      navigator.mediaDevices &&
+      typeof navigator.mediaDevices.getUserMedia === 'function';
+
+    if (!hasGetUserMedia) {
+      this.cameraInput?.nativeElement.click();
+      return;
+    }
+
+    this.isCameraOpen = true;
+    this.cameraError = '';
+    this.isCameraLoading = true;
+    await this.startCameraStream();
+  }
+
+  async startCameraStream(): Promise<void> {
+    this.stopCameraStream();
+    this.cameraError = '';
+    this.isCameraLoading = true;
+
+    try {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        this.availableCameras = devices.filter(d => d.kind === 'videoinput');
+      } catch {
+        this.availableCameras = [];
+      }
+
+      const constraints: MediaStreamConstraints = {
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+        audio: false,
+      };
+
+      if (this.availableCameras.length > 0 && this.availableCameras[this.selectedCameraIndex]?.deviceId) {
+        (constraints.video as MediaTrackConstraints).deviceId = {
+          exact: this.availableCameras[this.selectedCameraIndex].deviceId,
+        };
+      }
+
+      this.cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+      this.isCameraLoading = false;
+
+      setTimeout(() => {
+        if (this.cameraVideo?.nativeElement && this.cameraStream) {
+          this.cameraVideo.nativeElement.srcObject = this.cameraStream;
+          this.cameraVideo.nativeElement.play().catch(() => {});
+        }
+      }, 60);
+    } catch (err: any) {
+      console.warn('getUserMedia error, providing native camera option:', err);
+      this.isCameraLoading = false;
+      if (err.name === 'NotAllowedError') {
+        this.cameraError = 'Camera permission was denied. Please allow camera in site settings or tap below to open device camera.';
+      } else {
+        this.cameraError = 'Live camera could not be started directly. Tap below to use your device camera.';
+      }
+    }
+  }
+
+  stopCameraStream(): void {
+    if (this.cameraStream) {
+      this.cameraStream.getTracks().forEach(t => t.stop());
+      this.cameraStream = null;
+    }
+  }
+
+  closeCamera(): void {
+    this.stopCameraStream();
+    this.isCameraOpen = false;
+    this.cameraError = '';
+  }
+
+  switchCameraDevice(): void {
+    if (this.availableCameras.length <= 1) return;
+    this.selectedCameraIndex = (this.selectedCameraIndex + 1) % this.availableCameras.length;
+    this.startCameraStream();
+  }
+
+  capturePhoto(): void {
+    const video = this.cameraVideo?.nativeElement;
+    if (!video || !this.cameraStream) return;
+
+    this.isShutterFlashing = true;
+    setTimeout(() => this.isShutterFlashing = false, 250);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const photoName = `door-snap-${this.filePreviews.length + 1}-${Date.now().toString().slice(-4)}.jpg`;
+      const file = new File([blob], photoName, { type: 'image/jpeg' });
+      this.addFiles([file]);
+
+      if (this.filePreviews.length >= 5) {
+        this.closeCamera();
+      }
+    }, 'image/jpeg', 0.92);
+  }
+
+  triggerNativeCamera(): void {
+    this.closeCamera();
+    this.cameraInput?.nativeElement.click();
   }
 
   startScan(): void {
@@ -779,6 +955,18 @@ export class WizardComponent
       this.arSession.setDoorImage(
         this.selectedFiles[0],
       );
+    }
+
+    if (result.clean_door_image) {
+      this.arSession.setCleanDoorImageUrl(result.clean_door_image);
+    } else {
+      this.arSession.setCleanDoorImageUrl(null);
+    }
+
+    if (result.target_placement) {
+      this.arSession.setTargetPlacement(result.target_placement);
+    } else {
+      this.arSession.setTargetPlacement(null);
     }
 
     const material =
@@ -1218,6 +1406,11 @@ export class WizardComponent
   selectProduct(
     product: Product,
   ): void {
+    const rec = this.getRecommendation(product.id);
+    if (rec && rec.status !== 'compatible') {
+      return;
+    }
+
     const finish =
       product.finishes[0] ||
       'Satin Chrome';
@@ -1312,8 +1505,16 @@ export class WizardComponent
       return;
     }
 
-    if (this.selectedFiles.length > 0) {
+    if (this.selectedFiles.length > 0 && !this.arSession.hasCustomDoorImage()) {
       this.arSession.setDoorImage(this.selectedFiles[0]);
+    }
+
+    if (this.analysisResult?.clean_door_image && !this.arSession.getCleanDoorImageUrl()) {
+      this.arSession.setCleanDoorImageUrl(this.analysisResult.clean_door_image);
+    }
+
+    if (this.analysisResult?.target_placement && !this.arSession.getTargetPlacement()) {
+      this.arSession.setTargetPlacement(this.analysisResult.target_placement);
     }
 
     if (this.selectedProduct) {
@@ -1373,6 +1574,10 @@ export class WizardComponent
   }
 
   ngOnInit(): void {
+    if (!this.analysisResult) {
+      this.analysisResult = this.doorVision.getLastResult();
+    }
+
     if (this.config.product) {
       this.screen = 'bom';
       return;
@@ -1500,6 +1705,8 @@ export class WizardComponent
 
   ngOnDestroy(): void {
     this.clearTimers();
+    this.stopCameraStream();
+    this.filePreviews.forEach(p => URL.revokeObjectURL(p.url));
   }
 
   getRecommendation(

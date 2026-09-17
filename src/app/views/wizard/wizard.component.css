@@ -547,3 +547,368 @@
   color: #64748b;
   font-size: 10px;
 }
+
+/* =========================================================
+   PHOTO THUMBNAILS GALLERY & PREVIEWS (Wizard Scan & GDPR)
+   ========================================================= */
+
+.scan-panel.empty {
+  border: 2px dashed #b9c8d9;
+  background: #f8fbfd;
+  border-radius: 20px;
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.scan-panel.empty:hover {
+  border-color: #1565c0;
+  background: #f1f7fe;
+}
+
+.scan-action-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.scan-illustration small {
+  display: block;
+  font-size: 11px;
+  color: #8395a7;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+/* Uploaded Thumbnails Container */
+.scan-thumbnails-container {
+  border: 1px solid #d9e2ec;
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+  margin-bottom: 20px;
+}
+
+.thumbnails-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #edf2f7;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.thumbnails-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.thumb-header-icon {
+  font-size: 28px;
+  width: 28px;
+  height: 28px;
+  color: #1565c0;
+}
+
+.thumbnails-heading strong {
+  display: block;
+  font-size: 14px;
+  color: #1e293b;
+  font-weight: 750;
+}
+
+.thumbnails-heading span {
+  display: block;
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.thumbnails-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.aux-thumb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.aux-thumb-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.aux-thumb-btn.danger {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.aux-thumb-btn.danger:hover {
+  background: #fee2e2;
+  border-color: #f87171;
+}
+
+.aux-thumb-btn mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+
+/* Grid */
+.thumbnails-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
+}
+
+.thumbnail-card {
+  position: relative;
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.thumbnail-card:hover {
+  transform: translateY(-2px);
+  border-color: #94a3b8;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+}
+
+.thumbnail-card.is-primary {
+  border-color: #1565c0;
+  background: #f0f7ff;
+}
+
+.thumb-media-wrapper {
+  position: relative;
+  width: 100%;
+  height: 125px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.thumb-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.25s ease;
+}
+
+.thumbnail-card:hover .thumb-image {
+  transform: scale(1.04);
+}
+
+.thumb-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(4px);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: 6px;
+  letter-spacing: 0.3px;
+}
+
+.thumb-badge.primary {
+  background: #1565c0;
+  box-shadow: 0 2px 6px rgba(21, 101, 192, 0.4);
+}
+
+.thumb-delete-button {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.9);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25);
+  transition: all 0.15s ease;
+}
+
+.thumb-delete-button:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
+.thumb-delete-button mat-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+}
+
+.thumb-caption {
+  padding: 9px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.thumb-name {
+  font-size: 11px;
+  font-weight: 650;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.thumb-size {
+  font-size: 10px;
+  color: #64748b;
+}
+
+/* Add Slot Card */
+.thumbnail-card.add-slot {
+  height: 100%;
+  min-height: 170px;
+  border: 2px dashed #cbd5e1;
+  background: #fafcff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  gap: 6px;
+  padding: 16px 12px;
+  text-align: center;
+  color: #64748b;
+}
+
+.thumbnail-card.add-slot:hover {
+  border-color: #1565c0;
+  background: #f0f7ff;
+  color: #1565c0;
+}
+
+.thumbnail-card.add-slot mat-icon {
+  font-size: 32px;
+  width: 32px;
+  height: 32px;
+  color: #94a3b8;
+}
+
+.thumbnail-card.add-slot:hover mat-icon {
+  color: #1565c0;
+}
+
+.thumbnail-card.add-slot span {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.thumbnail-card.add-slot small {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+/* GDPR Preview Strip */
+.gdpr-preview-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+}
+
+.gdpr-thumb-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 6px 10px 6px 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.gdpr-chip-media {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #e2e8f0;
+}
+
+.gdpr-chip-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.gdpr-chip-badge {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  background: rgba(15, 23, 42, 0.8);
+  color: #ffffff;
+  font-size: 8px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.gdpr-chip-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-width: 120px;
+}
+
+.gdpr-chip-filename {
+  font-size: 11px;
+  font-weight: 650;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gdpr-chip-size {
+  font-size: 10px;
+  color: #64748b;
+}

@@ -75,6 +75,10 @@
         },
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
+          "options": {
+            "proxyConfig": "proxy.conf.json",
+            "allowedHosts": [".trycloudflare.com", ".lhr.life", ".loca.lt", "192.168.2.237"]
+          },
           "configurations": {
             "production": {
               "buildTarget": "retrofit-angular:build:production"

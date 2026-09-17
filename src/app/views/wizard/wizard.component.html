@@ -7,6 +7,14 @@
     hidden
     (change)="onFilesSelected($event)"
   >
+  <input
+    #cameraInput
+    type="file"
+    accept="image/*"
+    capture="environment"
+    hidden
+    (change)="onFilesSelected($event)"
+  >
 
   <header class="wizard-header">
 <div class="brand-mark"><img src="assets/Retrofit AI Logo.png" alt="Retrofit AI logo"></div>    <div class="brand-copy">
@@ -148,20 +156,101 @@
           <h1>Scan your door</h1>
           <p class="intro">Take a photo or upload an existing image. AI will extract door parameters automatically.</p>
           <div class="scan-info"><mat-icon>auto_fix_high</mat-icon><div>Using <strong>visual profiling</strong> to detect material, door profile, lock type, and handle details.</div></div>
-<div class="scan-panel">
-            <div class="scan-illustration"><mat-icon>door_front</mat-icon><span>{{ selectedFiles.length ? selectedFiles.length + ' photos selected' : '1–5 door photos required' }}</span></div>
-            <button type="button" class="primary-button" (click)="openFilePicker()"><mat-icon>cloud_upload</mat-icon> Upload door photos</button>
-            <button type="button" class="secondary-button" (click)="openFilePicker()"><mat-icon>photo_camera</mat-icon> Use camera</button>
-          </div>
+          @if (filePreviews.length === 0) {
+            <!-- Empty state: Upload Box -->
+            <div
+              class="scan-panel empty"
+              (dragover)="$event.preventDefault()"
+              (drop)="onDropFiles($event)"
+            >
+              <div class="scan-illustration">
+                <mat-icon>door_front</mat-icon>
+                <span>1–5 door photos required</span>
+                <small>Drag & drop photos here or choose an option below</small>
+              </div>
+              <div class="scan-action-buttons">
+                <button type="button" class="primary-button" (click)="openFilePicker()">
+                  <mat-icon>cloud_upload</mat-icon> Upload door photos
+                </button>
+                <button type="button" class="secondary-button" (click)="openCamera()">
+                  <mat-icon>photo_camera</mat-icon> Use camera
+                </button>
+              </div>
+            </div>
+          } @else {
+            <!-- Photos Uploaded: Responsive Photo Thumbnail Gallery -->
+            <div class="scan-thumbnails-container">
+              <div class="thumbnails-toolbar">
+                <div class="thumbnails-heading">
+                  <mat-icon class="thumb-header-icon">photo_library</mat-icon>
+                  <div>
+                    <strong>{{ filePreviews.length }} of 5 Photos Uploaded</strong>
+                    <span>First photo (#1) will be used as your door background in AR</span>
+                  </div>
+                </div>
+                <div class="thumbnails-toolbar-actions">
+                  @if (filePreviews.length < 5) {
+                    <button type="button" class="aux-thumb-btn" (click)="openFilePicker()" title="Add more photos">
+                      <mat-icon>add_photo_alternate</mat-icon> Add photo
+                    </button>
+                    <button type="button" class="aux-thumb-btn" (click)="openCamera()" title="Take photo">
+                      <mat-icon>photo_camera</mat-icon> Camera
+                    </button>
+                  }
+                  <button type="button" class="aux-thumb-btn danger" (click)="clearAllPhotos()" title="Clear all photos">
+                    <mat-icon>delete_outline</mat-icon> Clear all
+                  </button>
+                </div>
+              </div>
+
+              <!-- Thumbnails Grid -->
+              <div class="thumbnails-grid">
+                @for (preview of filePreviews; track preview.url; let i = $index) {
+                  <div class="thumbnail-card" [class.is-primary]="i === 0">
+                    <div class="thumb-media-wrapper">
+                      <img [src]="preview.url" [alt]="preview.name" class="thumb-image" />
+                      <div class="thumb-badge" [class.primary]="i === 0">
+                        {{ i === 0 ? 'Primary (AR)' : '#' + (i + 1) }}
+                      </div>
+                      <button
+                        type="button"
+                        class="thumb-delete-button"
+                        (click)="removePhoto(i, $event)"
+                        title="Remove photo"
+                        aria-label="Remove photo"
+                      >
+                        <mat-icon>close</mat-icon>
+                      </button>
+                    </div>
+                    <div class="thumb-caption">
+                      <span class="thumb-name" [title]="preview.name">{{ preview.name }}</span>
+                      <span class="thumb-size">{{ preview.sizeFormatted }}</span>
+                    </div>
+                  </div>
+                }
+
+                @if (filePreviews.length < 5) {
+                  <div
+                    class="thumbnail-card add-slot"
+                    (click)="openFilePicker()"
+                    (dragover)="$event.preventDefault()"
+                    (drop)="onDropFiles($event)"
+                    title="Add another photo"
+                  >
+                    <mat-icon>add_a_photo</mat-icon>
+                    <span>Add Photo</span>
+                    <small>{{ 5 - filePreviews.length }} slot{{ (5 - filePreviews.length) > 1 ? 's' : '' }} left</small>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
           <div class="ai-note">
             <mat-icon>tips_and_updates</mat-icon>
             <div><strong>Best results:</strong> include one clear photo of the whole door, plus one close-up of the lock/handle hardware — close-ups let the AI read small details (brand text, deadbolts, keyholes) far more accurately than a wide shot alone.</div>
           </div>
-          @if (selectedFiles.length) {
-            <div class="small-note">{{ selectedFiles.length }} image{{ selectedFiles.length !== 1 ? 's' : '' }} ready for analysis.</div>
-          } @else {
-            <div class="small-note">Select between 1 and 5 clear photos showing the door and existing lock.</div>
-          }
+
           @if (scanError) {
             <div class="scan-error"><mat-icon>error</mat-icon><span>{{ scanError }}</span></div>
           }
@@ -169,7 +258,7 @@
           <button
             type="button"
             class="primary-button full"
-            [disabled]="selectedFiles.length < 1 || selectedFiles.length > 5"
+            [disabled]="filePreviews.length < 1 || filePreviews.length > 5"
             (click)="startScan()">
             Continue to privacy check
             <mat-icon>arrow_forward</mat-icon>
@@ -182,12 +271,30 @@
           <h1>Before we scan your door</h1>
           <p class="intro">Your photo is used only to extract technical door information for this configuration.</p>
           <div class="privacy-card"><mat-icon>shield</mat-icon><div><strong>Privacy & GDPR</strong><p>Do not upload images containing personal data or identifiable people.</p></div></div>
-          <div class="scan-file-summary"><mat-icon>photo_library</mat-icon><span><strong>{{ selectedFiles.length }} photos selected</strong><small>Analysis accepts 1–5 images.</small></span></div>
+          <div class="scan-file-summary"><mat-icon>photo_library</mat-icon><span><strong>{{ filePreviews.length }} photos selected</strong><small>Analysis accepts 1–5 images.</small></span></div>
+
+          @if (filePreviews.length) {
+            <div class="gdpr-preview-strip">
+              @for (preview of filePreviews; track preview.url; let i = $index) {
+                <div class="gdpr-thumb-chip">
+                  <div class="gdpr-chip-media">
+                    <img [src]="preview.url" [alt]="preview.name" class="gdpr-chip-img">
+                    <span class="gdpr-chip-badge">{{ i === 0 ? 'Primary' : '#' + (i + 1) }}</span>
+                  </div>
+                  <div class="gdpr-chip-meta">
+                    <span class="gdpr-chip-filename" [title]="preview.name">{{ preview.name }}</span>
+                    <span class="gdpr-chip-size">{{ preview.sizeFormatted }}</span>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
           @if (scanError) {
             <div class="scan-error"><mat-icon>error</mat-icon><span>{{ scanError }}</span></div>
           }
           <label class="check-row"><input type="checkbox" [(ngModel)]="gdprChecked"><span>I confirm these photos contain no personal data or identifiable images of individuals.</span></label>
-          <button type="button" class="primary-button full" [disabled]="!gdprChecked || selectedFiles.length < 1 || selectedFiles.length > 5" (click)="beginAnalysis()">Analyse my door <mat-icon>auto_awesome</mat-icon></button>
+          <button type="button" class="primary-button full" [disabled]="!gdprChecked || filePreviews.length < 1 || filePreviews.length > 5" (click)="beginAnalysis()">Analyse my door <mat-icon>auto_awesome</mat-icon></button>
         }
 
         @if (detailsMode === 'analyzing') {
@@ -520,6 +627,26 @@
                 </article>
               }
             }
+          </div>
+        } @else if (analysisResult) {
+          <div class="no-compatible-card">
+            <div class="no-compatible-icon">
+              <mat-icon>block</mat-icon>
+            </div>
+            <div class="no-compatible-text">
+              <h3>No Compatible Smart Locks Found</h3>
+              <p>
+                Based on your door thickness of <strong>{{ config.thickness }}mm</strong>,
+                none of the available SALTO smart locks can be installed safely.
+              </p>
+              <p class="thickness-hint">
+                💡 <em>All SALTO mortise and cylinder locks require a door thickness between <strong>30mm and 120mm</strong>.</em>
+              </p>
+              <button type="button" class="back-to-details-btn" (click)="goToStep('details')">
+                <mat-icon>arrow_back</mat-icon>
+                <span>Edit Door Dimensions</span>
+              </button>
+            </div>
           </div>
         }
 
@@ -905,4 +1032,90 @@
       </section>
     }
   </main>
+
+  <!-- Live In-App Camera Modal -->
+  @if (isCameraOpen) {
+    <div class="camera-modal-backdrop" (click)="closeCamera()">
+      <div class="camera-modal-dialog" (click)="$event.stopPropagation()">
+        <div class="camera-modal-header">
+          <div class="camera-modal-title">
+            <mat-icon>photo_camera</mat-icon>
+            <div>
+              <h3>Take Door Photo</h3>
+              <span>Photo {{ filePreviews.length + 1 }} of 5</span>
+            </div>
+          </div>
+          <button type="button" class="modal-close-btn" (click)="closeCamera()" title="Close camera" aria-label="Close camera">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+
+        <div class="camera-viewfinder-container">
+          <video #cameraVideo class="camera-viewfinder-video" autoplay playsinline muted></video>
+
+          @if (isCameraLoading) {
+            <div class="camera-loading-overlay">
+              <mat-icon class="spin-icon">refresh</mat-icon>
+              <span>Starting camera feed...</span>
+            </div>
+          }
+
+          @if (cameraError) {
+            <div class="camera-modal-error">
+              <mat-icon>warning</mat-icon>
+              <p>{{ cameraError }}</p>
+              <button type="button" class="primary-button" (click)="triggerNativeCamera()">
+                <mat-icon>photo_camera</mat-icon> Open Device Camera
+              </button>
+            </div>
+          }
+
+          @if (!cameraError && !isCameraLoading) {
+            <!-- Viewfinder framing corners -->
+            <div class="viewfinder-frame">
+              <div class="frame-corner top-left"></div>
+              <div class="frame-corner top-right"></div>
+              <div class="frame-corner bottom-left"></div>
+              <div class="frame-corner bottom-right"></div>
+              <div class="frame-hint">
+                <mat-icon>center_focus_strong</mat-icon>
+                <span>Frame door, frame & lock in view</span>
+              </div>
+            </div>
+          }
+
+          <!-- Shutter Flash Effect -->
+          @if (isShutterFlashing) {
+            <div class="camera-shutter-flash"></div>
+          }
+        </div>
+
+        <div class="camera-modal-footer">
+          @if (availableCameras.length > 1) {
+            <button type="button" class="camera-aux-btn" (click)="switchCameraDevice()" title="Switch Camera (Front/Back)">
+              <mat-icon>cameraswitch</mat-icon>
+            </button>
+          } @else {
+            <div class="aux-spacer"></div>
+          }
+
+          <button
+            type="button"
+            class="camera-shutter-btn"
+            [disabled]="isCameraLoading || !!cameraError"
+            (click)="capturePhoto()"
+            title="Snap Photo"
+            aria-label="Snap Photo">
+            <div class="shutter-inner">
+              <mat-icon>photo_camera</mat-icon>
+            </div>
+          </button>
+
+          <button type="button" class="camera-aux-btn native" (click)="triggerNativeCamera()" title="Use Native Phone Camera App">
+            <mat-icon>smartphone</mat-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+  }
 </div>

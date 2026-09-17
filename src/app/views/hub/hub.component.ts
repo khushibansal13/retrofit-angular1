@@ -1,4 +1,4 @@
-﻿import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatIconModule } from '@angular/material/icon';
@@ -57,6 +57,7 @@ export class HubComponent {
   editConfiguration = new EventEmitter<void>();
 
   tab = 0;
+  previousTab: number | null = null;
 
   readonly tabs: Tab[] = [
     { label: 'AR View', icon: 'view_in_ar' },
@@ -71,11 +72,23 @@ export class HubComponent {
   }
 
   setTab(index: number): void {
-    this.tab = index;
+    if (this.tab !== index) {
+      this.previousTab = this.tab;
+      this.tab = index;
+    }
   }
 
   goToAR(): void {
+    this.previousTab = this.tab;
     this.tab = 0;
+  }
+
+  onArBack(): void {
+    if (this.previousTab !== null && this.previousTab !== 0) {
+      this.tab = this.previousTab;
+    } else {
+      this.editConfiguration.emit();
+    }
   }
 
   onConfigChange(config: DoorConfig): void {

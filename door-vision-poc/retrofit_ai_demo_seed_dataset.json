@@ -27,7 +27,7 @@
       "retrofit": true,
       "outside_appearance": "invisible_from_outside",
       "application": ["apartment", "residential"],
-      "door_thickness_mm": null,
+      "door_thickness_mm": { "min": 30, "max": 120 },
       "technical_specs": {
         "dimensions_mm": "60 x 61",
         "weight_g": 230,
@@ -38,12 +38,19 @@
       },
       "technology_platforms": ["Salto Homelok"],
       "wireless": ["Bluetooth LE"],
-      "compatibility_inputs_required": ["door_standard", "lock_type"],
+      "compatibility_inputs_required": ["door_standard", "lock_type", "thickness_mm"],
       "compatibility_rules": {
         "door_standard": {
           "any_of": ["euro_profile", "passage_latch_euro"],
           "on_fail": "incompatible",
           "fail_message": "Incompatible: DLok Euro requires a DIN Euro profile door preparation."
+        },
+        "thickness_mm": {
+          "min": 30,
+          "max": 120,
+          "on_fail": "incompatible",
+          "fail_message": "Door thickness is outside the 30-120mm supported range.",
+          "pass_message": "Door thickness within the 30-120mm supported range."
         },
         "lock_type": {
           "any_of": ["euro_profile_cylinder"],

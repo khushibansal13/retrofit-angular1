@@ -69,6 +69,20 @@ export class SwitchLockComponent {
     );
   }
 
+  get recommended(): Product[] {
+    const thickness = parseFloat(this.config.thickness);
+    return ALL_PRODUCTS.filter(product => {
+      const materialMatch =
+        this.material === '' ||
+        product.compatible.includes(this.material);
+      const thicknessMatch =
+        isNaN(thickness) ||
+        thickness <= 0 ||
+        (thickness >= product.thicknessMin && thickness <= product.thicknessMax);
+      return materialMatch && thicknessMatch;
+    });
+  }
+
   get sortedProducts(): Product[] {
     return [...ALL_PRODUCTS].sort((a, b) => {
       const aScore = this.isBestMatch(a) ? 0 : 1;

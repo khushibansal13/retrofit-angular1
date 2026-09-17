@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from analyzer import analyze_door_for_salto
 from engine import SaltoCompatibilityEngine
+from inpainter import clean_door_inpaint, detect_target_placement
 
 from schema import (
     ComponentObs,
@@ -245,12 +246,33 @@ async def analyze_door_batch(
             )
         )
 
+        handing_val = "right_hand"
+        if hasattr(profile, "handing") and profile.handing:
+            handing_val = profile.handing.value if hasattr(profile.handing, "value") else str(profile.handing)
+
+        clean_door_b64 = None
+        target_placement = None
+        if temp_paths:
+            # Existing lock is retained as requested by user; no inpaint needed
+            clean_door_b64 = None
+
+            try:
+                target_placement = detect_target_placement(temp_paths[0], handing_hint=handing_val)
+            except Exception as target_err:
+                print(f"[DoorVision] Target detection warning: {target_err}")
+
         return {
             "profile":
                 profile.model_dump(),
 
             "recommendations":
                 results,
+
+            "clean_door_image":
+                clean_door_b64,
+
+            "target_placement":
+                target_placement,
 
             "metadata": {
                 "images_analyzed":
@@ -288,6 +310,43 @@ async def analyze_door_batch(
                     os.remove(path)
                 except OSError:
                     pass
+
+
+# =========================================================
+# Standalone Door Lock Removal / Inpainting
+# =========================================================
+
+@app.post("/api/clean-door")
+async def clean_door_endpoint(
+    file: Optional[UploadFile] = File(None),
+    handing: str = "right_hand",
+):
+    if not file:
+        raise HTTPException(status_code=400, detail="No image file provided.")
+
+    suffix = os.path.splitext(file.filename or "")[1] or ".jpg"
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+    try:
+        shutil.copyfileobj(file.file, temp_file)
+        temp_file.close()
+
+        clean_b64 = clean_door_inpaint(temp_file.name, handing=handing)
+        placement = detect_target_placement(temp_file.name, handing_hint=handing)
+        return {
+            "clean_door_image": clean_b64,
+            "target_placement": placement
+        }
+    except Exception as err:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Door lock inpainting failed: {str(err)}",
+        )
+    finally:
+        if os.path.exists(temp_file.name):
+            try:
+                os.remove(temp_file.name)
+            except OSError:
+                pass
 
 
 # =========================================================
@@ -588,3 +647,28 @@ def map_thickness_class(thickness_mm: float) -> ThicknessClass:
         return ThicknessClass.THICK_55_85MM
 
     return ThicknessClass.OVER_85MM
+
+
+# =========================================================
+# Serve Built Angular Frontend (SPA)
+# =========================================================
+dist_browser_dir = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "..",
+    "dist",
+    "retrofit-angular",
+    "browser",
+)
+if os.path.isdir(dist_browser_dir):
+    from starlette.responses import FileResponse
+
+    @app.exception_handler(404)
+    async def spa_404_handler(request, exc):
+        if request.url.path.startswith("/api"):
+            raise HTTPException(status_code=404, detail="API endpoint not found")
+        index_file = os.path.join(dist_browser_dir, "index.html")
+        if os.path.isfile(index_file):
+            return FileResponse(index_file)
+        raise exc
+
+    app.mount("/", StaticFiles(directory=dist_browser_dir, html=True), name="spa")

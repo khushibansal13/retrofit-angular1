@@ -2,19 +2,26 @@
 
   <!-- Header -->
   <header class="ar-header">
-    <button type="button" class="ar-back-button" (click)="back.emit()">
-      <mat-icon>arrow_back</mat-icon>
-      Edit configuration
-    </button>
+    <div class="header-main-group">
+      <button
+        type="button"
+        class="ar-back-button"
+        (click)="back.emit()"
+        title="Edit configuration"
+      >
+        <mat-icon>arrow_back</mat-icon>
+        <span>Edit configuration</span>
+      </button>
 
-    <div>
-      <div class="eyebrow">AR VIEW</div>
+      <div class="header-text-group">
+        <div class="eyebrow">AR VIEW</div>
 
-      <h1>See how your lock will look</h1>
+        <h1>See how your lock will look</h1>
 
-      <p>
-        Position the selected lock on your actual door before installation.
-      </p>
+        <p>
+          Position the selected lock on your actual door before installation.
+        </p>
+      </div>
     </div>
 
     <div class="header-badge">
@@ -41,6 +48,16 @@
               <span>{{ isCustomDoor ? 'Your Uploaded Door' : 'Default Door Preview' }}</span>
             </div>
 
+            <button
+              type="button"
+              class="ikea-tool-btn"
+              (click)="snapToTarget()"
+              title="Snap lock directly onto detected white dot / target"
+            >
+              <mat-icon>gps_fixed</mat-icon>
+              <span>Snap to Target</span>
+            </button>
+
             <button type="button" class="upload-link-button" (click)="triggerDoorUpload()">
               <mat-icon>upload_file</mat-icon> Change door photo
             </button>
@@ -57,12 +74,14 @@
             <div class="mode-toggle">
               <button
                 type="button"
-                class="mode-btn"
+                class="mode-btn mode-btn-3d"
                 [class.active]="displayMode === '3d'"
                 (click)="setDisplayMode('3d')"
-                title="Interactive 3D Model"
+                title="3D Model (Under Construction)"
               >
-                <mat-icon>view_in_ar</mat-icon> 3D Model
+                <mat-icon>view_in_ar</mat-icon>
+                <span>3D Model</span>
+                <span class="under-construction-badge">Under Construction</span>
               </button>
               <button
                 type="button"
@@ -72,6 +91,15 @@
                 title="Photo render overlay"
               >
                 <mat-icon>photo</mat-icon> 2D Photo
+              </button>
+              <button
+                type="button"
+                class="mode-btn live-btn"
+                [class.active]="displayMode === 'live'"
+                (click)="setDisplayMode('live')"
+                title="Live Camera AR View"
+              >
+                <mat-icon>videocam</mat-icon> View Live
               </button>
             </div>
 
@@ -91,110 +119,221 @@
           #stage
           class="ar-stage"
           [class.is-placed]="isPlaced"
+          [class.is-live]="displayMode === 'live'"
           (click)="onStageClick($event)"
           (pointermove)="onDrag($event)"
           (pointerup)="stopDrag()"
           (pointercancel)="stopDrag()"
         >
 
-          <!-- Top Stage Placement Guide -->
-          <div class="stage-guide-badge" [class.is-placed]="isPlaced">
-            <mat-icon>{{ isPlaced ? 'check_circle' : 'touch_app' }}</mat-icon>
-            <span>
-              {{ isPlaced ? (productName + ' placed on door • Click anywhere to reposition') : ('Click anywhere on door to place ' + productName) }}
-            </span>
-          </div>
 
-          <!-- Click Ripple Pulse Animation -->
-          @if (rippleActive) {
-            <div
-              class="placement-ripple"
-              [style.left]="rippleCoords.x + '%'"
-              [style.top]="rippleCoords.y + '%'"
-            ></div>
-          }
 
-          <!-- Customer Door Photo -->
-          <img
-            class="door-image"
-            [src]="doorImageUrl"
-            alt="Your door"
-          />
-
-          <!-- Dark overlay -->
-          <div class="stage-overlay"></div>
-
-          <!-- Product overlay -->
+          <!-- Door Viewport: calibrated to match door image aspect ratio with zero letterbox distortion -->
           <div
-            class="product-placement"
-            [ngClass]="getProductPlacementClass()"
-            [class.is-3d]="displayMode === '3d'"
-            [class.animate-pop]="justPlaced"
-            [style.left]="placementLeft"
-            [style.top]="placementTop"
-            [style.transform]="placementTransform"
-            (click)="$event.stopPropagation()"
+            #doorViewport
+            class="door-viewport"
+            [class.is-live]="displayMode === 'live'"
+            [style.aspect-ratio]="doorAspectRatio"
           >
+            <!-- Click Ripple Pulse Animation -->
+            @if (rippleActive) {
+              <div
+                class="placement-ripple"
+                [style.left]="rippleCoords.x + '%'"
+                [style.top]="rippleCoords.y + '%'"
+              ></div>
+            }
 
-            <!-- Lock Tag on Door -->
-            <div class="lock-placement-badge">
-              <span class="badge-brand">SALTO</span>
-              <span class="badge-model">{{ productName }}</span>
-              @if (productFinish) {
-                <span class="badge-finish">• {{ productFinish }}</span>
+            <!-- Live Camera Video Feed -->
+            @if (displayMode === 'live') {
+              <video
+                #videoElement
+                class="live-camera-video"
+                autoplay
+                playsinline
+                muted
+              ></video>
+
+              <!-- Live Status Bar & Camera Tools -->
+              <div class="live-status-bar">
+                <div class="live-pill">
+                  <span class="live-pulse-dot"></span>
+                  <span>LIVE AR CAMERA</span>
+                </div>
+
+                <div class="live-actions">
+                  @if (hasMultipleCameras) {
+                    <button
+                      type="button"
+                      class="live-action-btn"
+                      (click)="switchCamera($event)"
+                      title="Switch Camera (Front / Rear)"
+                    >
+                      <mat-icon>cameraswitch</mat-icon>
+                    </button>
+                  }
+
+                  <button
+                    type="button"
+                    class="live-action-btn capture-btn"
+                    (click)="captureFrame($event)"
+                    title="Freeze current door frame & keep lock placement"
+                  >
+                    <mat-icon>photo_camera</mat-icon>
+                    <span>Freeze Photo</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Camera Error Message -->
+              @if (cameraError) {
+                <div class="camera-error-banner">
+                  <mat-icon>videocam_off</mat-icon>
+                  <div class="error-text">
+                    <strong>Camera Permission Required</strong>
+                    <p>{{ cameraError }}</p>
+                  </div>
+                  <button type="button" class="retry-btn" (click)="startCamera()">
+                    Retry
+                  </button>
+                </div>
               }
-            </div>
-
-            <!-- Drag Handle -->
-            <div
-              class="placement-drag-handle"
-              (pointerdown)="startDrag($event)"
-              title="Drag to adjust lock position on your door"
-            >
-              <mat-icon>open_with</mat-icon>
-              <span>Drag to Adjust</span>
-            </div>
-
-            <div class="placement-ring"></div>
-
-            <!-- 3D Model View -->
-            @if (displayMode === '3d') {
-              <model-viewer
-                class="model-3d-element"
-                [class.flipped]="flipHorizontal"
-                [src]="modelUrl"
-                alt="SALTO Smart Lock 3D Model"
-                camera-controls
-                camera-orbit="0deg 90deg auto"
-                min-camera-orbit="auto 60deg auto"
-                max-camera-orbit="auto 120deg auto"
-                touch-action="pan-y"
-                ar
-                ar-modes="webxr scene-viewer quick-look"
-                shadow-intensity="1.2"
-                environment-image="neutral"
-                exposure="1.0"
-              >
-              </model-viewer>
             } @else {
-              <!-- 2D Photo View -->
+              <!-- Customer Door Photo (Original Photo) -->
               <img
-                class="product-image"
-                [class.flipped]="flipHorizontal"
-                (pointerdown)="startDrag($event)"
-                [src]="productImage"
-                [alt]="productName"
-                draggable="false"
+                #doorImageElem
+                class="door-image"
+                [src]="doorImageUrl"
+                (load)="onDoorImageLoaded($event)"
+                alt="Your door"
               />
             }
 
+            <!-- Dark overlay -->
+            <div class="stage-overlay" [class.live-subtle]="displayMode === 'live'" [class.blur-construction]="displayMode === '3d'"></div>
+
+            @if (displayMode === '3d') {
+              <!-- 3D Under Construction Card -->
+              <div class="under-construction-stage-overlay">
+                <div class="under-construction-card">
+                  <div class="construction-pill-badge">
+                    <span class="pulse-dot-amber"></span>
+                    <span>UNDER CONSTRUCTION</span>
+                  </div>
+
+                  <div class="construction-avatar">
+                    <mat-icon class="icon-main">view_in_ar</mat-icon>
+                    <span class="icon-sub"><mat-icon>construction</mat-icon></span>
+                  </div>
+
+                  <h3 class="construction-card-title">3D Interactive Model</h3>
+                  <p class="construction-card-text">
+                    Interactive 3D CAD digital twins and WebXR models for <strong>{{ productName }}</strong> are currently under construction.
+                  </p>
+
+                  <div class="construction-checklist">
+                    <div class="chk-item ready">
+                      <mat-icon>check_circle</mat-icon>
+                      <div>
+                        <strong>2D Photorealistic Overlay:</strong>
+                        <span>Ready & available with door dimensions & position controls</span>
+                      </div>
+                    </div>
+                    <div class="chk-item ready">
+                      <mat-icon>check_circle</mat-icon>
+                      <div>
+                        <strong>View Live AR:</strong>
+                        <span>Real-time camera feed overlay for your mobile device</span>
+                      </div>
+                    </div>
+                    <div class="chk-item progress">
+                      <mat-icon>hourglass_top</mat-icon>
+                      <div>
+                        <strong>3D Interactive Orbit & CAD:</strong>
+                        <span>High-resolution geometry & textures in progress</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="construction-switch-buttons">
+                    <button type="button" class="btn-goto-2d" (click)="setDisplayMode('2d')">
+                      <mat-icon>photo</mat-icon>
+                      <span>Switch to 2D Photo View</span>
+                    </button>
+                    <button type="button" class="btn-goto-live" (click)="setDisplayMode('live')">
+                      <mat-icon>videocam</mat-icon>
+                      <span>Try View Live AR</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            } @else {
+              <!-- Product overlay (2D or Live) -->
+              <div
+                class="product-placement"
+                [ngClass]="getProductPlacementClass()"
+                [class.animate-pop]="justPlaced"
+                [class.is-locked]="isPositionLocked"
+                [class.is-dragging]="isDragging"
+                [class.menu-open]="showLockMenu"
+                [style.left]="placementLeft"
+                [style.top]="placementTop"
+                [style.height]="lockHeightStyle"
+                [style.transform]="placementTransform"
+                (mouseenter)="onLockMouseEnter()"
+                (mouseleave)="onLockMouseLeave()"
+                (pointerdown)="startDrag($event)"
+                (click)="onLockClick($event)"
+              >
+
+                <!-- Options shown on Lock Hover -->
+                <div
+                  class="lock-hover-actions"
+                  [class.is-visible]="showLockMenu"
+                  (mouseenter)="onLockMouseEnter()"
+                  (mouseleave)="onLockMouseLeave()"
+                  (pointerdown)="$event.stopPropagation()"
+                  (click)="$event.stopPropagation()"
+                >
+                  <button
+                    type="button"
+                    class="hover-action-btn"
+                    (click)="toggleHanding(); $event.stopPropagation()"
+                    title="Flip handle orientation (Left / Right)"
+                  >
+                    <mat-icon>swap_horiz</mat-icon>
+                    <span>Flip Handle</span>
+                  </button>
+
+                  <div class="hover-action-divider"></div>
+
+                  <button
+                    type="button"
+                    class="hover-action-btn"
+                    [class.active-locked]="isPositionLocked"
+                    (click)="togglePositionLock(); $event.stopPropagation()"
+                    [title]="isPositionLocked ? 'Position is locked. Click to unlock dragging.' : 'Position is unlocked. Click to lock in place.'"
+                  >
+                    <mat-icon>{{ isPositionLocked ? 'lock' : 'lock_open' }}</mat-icon>
+                    <span>{{ isPositionLocked ? 'Locked' : 'Unlock' }}</span>
+                  </button>
+                </div>
+
+                <!-- 2D Photo View -->
+                <img
+                  class="product-image"
+                  [class.flipped]="flipHorizontal"
+                  (pointerdown)="startDrag($event)"
+                  [src]="productImage"
+                  [alt]="productName"
+                  draggable="false"
+                />
+
+              </div>
+            }
           </div>
 
-          <!-- Measurement hint -->
-          <div class="placement-hint">
-            <span class="hint-icon">🎯</span>
-            <span>Click anywhere on your door to place the lock • Drag to adjust position • Orbit 3D</span>
-          </div>
+
 
         </div>
 
@@ -387,10 +526,10 @@
             </span>
 
             <div>
-              <strong>Drag & Orbit in 3D</strong>
+              <strong>Drag to Position</strong>
 
               <p>
-                Drag the handle to fine-tune the position. Click and drag on the 3D lock to view in 360°.
+                Drag the lock directly on the door to fine-tune its position.
               </p>
             </div>
 

@@ -4,6 +4,7 @@ import {
 } from '@angular/common/http';
 import {
   Observable,
+  tap,
 } from 'rxjs';
 
 export interface DoorVisionComponent {
@@ -83,6 +84,13 @@ export interface DoorVisionMetadata {
   principle: string;
 }
 
+export interface TargetPlacement {
+  x: number;
+  y: number;
+  is_left: boolean;
+  type?: string;
+}
+
 export interface DoorVisionResult {
   profile: DoorVisionProfile;
 
@@ -90,6 +98,10 @@ export interface DoorVisionResult {
     DoorVisionRecommendation[];
 
   metadata: DoorVisionMetadata;
+
+  clean_door_image?: string | null;
+
+  target_placement?: TargetPlacement | null;
 }
 
 export interface ManualDoorRecommendationRequest {
@@ -131,12 +143,45 @@ export interface CheckCompatibilityRequest {
 })
 export class DoorVisionService {
 
-  private readonly apiUrl =
-    'http://127.0.0.1:8000/api';
+  private get apiUrl(): string {
+    if (typeof window !== 'undefined') {
+      return '/api';
+    }
+    return 'http://127.0.0.1:8000/api';
+  }
+
+
+  private lastResult: DoorVisionResult | null = null;
+  private readonly CACHE_KEY = 'retrofit-last-analysis-result';
 
   constructor(
     private readonly http: HttpClient,
   ) {}
+
+  setLastResult(result: DoorVisionResult): void {
+    this.lastResult = result;
+    try {
+      sessionStorage.setItem(this.CACHE_KEY, JSON.stringify(result));
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
+  getLastResult(): DoorVisionResult | null {
+    if (this.lastResult) {
+      return this.lastResult;
+    }
+    try {
+      const stored = sessionStorage.getItem(this.CACHE_KEY);
+      if (stored) {
+        this.lastResult = JSON.parse(stored);
+        return this.lastResult;
+      }
+    } catch {
+      // Ignore storage errors
+    }
+    return null;
+  }
 
   analyzeDoor(
     files: File[],
@@ -165,6 +210,8 @@ export class DoorVisionService {
     return this.http.post<DoorVisionResult>(
       `${this.apiUrl}/analyze-door`,
       formData,
+    ).pipe(
+      tap(result => this.setLastResult(result))
     );
   }
 
@@ -175,6 +222,8 @@ export class DoorVisionService {
     return this.http.post<DoorVisionResult>(
       `${this.apiUrl}/check-compatibility`,
       request,
+    ).pipe(
+      tap(result => this.setLastResult(result))
     );
   }
 
@@ -186,6 +235,18 @@ export class DoorVisionService {
     return this.http.post<DoorVisionResult>(
       `${this.apiUrl}/recommend-products`,
       request,
+    ).pipe(
+      tap(result => this.setLastResult(result))
+    );
+  }
+
+  cleanDoor(file: File, handing: string = 'right_hand'): Observable<{ clean_door_image: string; target_placement?: TargetPlacement | null }> {
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+    formData.append('handing', handing);
+    return this.http.post<{ clean_door_image: string; target_placement?: TargetPlacement | null }>(
+      `${this.apiUrl}/clean-door`,
+      formData,
     );
   }
 
