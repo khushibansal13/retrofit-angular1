@@ -12,11 +12,16 @@ COPY . .
 RUN npm run build
 
 
-# Stage 2: Serve Angular using Nginx
-FROM nginx:alpine
+# Stage 2: Serve Angular using Node
+FROM node:22-alpine
 
-COPY --from=build /app/dist/retrofit-angular/browser /usr/share/nginx/html
+WORKDIR /app
+
+# Install a lightweight static server
+RUN npm install -g serve
+
+COPY --from=build /app/dist/retrofit-angular/browser ./dist
 
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["sh", "-c", "serve -s dist -l ${PORT:-80}"]
