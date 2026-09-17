@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+import uuid
 from typing import List, Optional
 
 from fastapi import (
@@ -8,6 +9,7 @@ from fastapi import (
     UploadFile,
     File,
     HTTPException,
+    BackgroundTasks,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
@@ -54,6 +56,30 @@ compatibility_engine = (
 
 
 # =========================================================
+# Background analysis jobs
+# =========================================================
+#
+# For the hackathon we keep job state in memory.
+#
+# Example:
+#
+# {
+#     "job-id": {
+#         "status": "processing",
+#         "result": None,
+#         "error": None
+#     }
+# }
+#
+# This avoids keeping the HTTP request open while
+# local Ollama performs the vision analysis.
+#
+# =========================================================
+
+analysis_jobs = {}
+
+
+# =========================================================
 # FastAPI
 # =========================================================
 
@@ -70,14 +96,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 locks_static_dir = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "..",
     "public",
     "locks",
 )
+
 if os.path.isdir(locks_static_dir):
-    app.mount("/locks", StaticFiles(directory=locks_static_dir), name="locks")
+    app.mount(
+        "/locks",
+        StaticFiles(
+            directory=locks_static_dir
+        ),
+        name="locks",
+    )
 
 
 # =========================================================
@@ -85,6 +119,7 @@ if os.path.isdir(locks_static_dir):
 # =========================================================
 
 def custom_openapi():
+
     if app.openapi_schema:
         return app.openapi_schema
 
@@ -114,6 +149,8 @@ app.openapi = custom_openapi
 # fields on DoorProfile — those were part of the earlier expanded schema
 # and don't exist here, so these request models only carry what
 # DoorProfile can actually hold: thickness, backset, center-to-center.
+#
+# =========================================================
 
 class CompatibilityRequest(BaseModel):
     profile: DoorProfile
@@ -153,7 +190,7 @@ async def health():
 
 
 # =========================================================
-# Analyze door from images
+# Analyze door information
 # =========================================================
 
 @app.get("/api/analyze-door")
@@ -166,27 +203,200 @@ async def analyze_door_info():
         "content_type": "multipart/form-data",
         "field_name": "files",
         "accepted_images": "1 to 5 image files (JPEG/PNG)",
-        "message": "The analyze-door service is running and ready. Upload images using HTTP POST multipart/form-data.",
-        "interactive_docs": "http://127.0.0.1:8000/docs#/default/analyze_door_batch_api_analyze_door_post",
+        "message": (
+            "The analyze-door service is running and ready. "
+            "Upload images using HTTP POST multipart/form-data."
+        ),
+        "interactive_docs": (
+            "http://127.0.0.1:8000/docs"
+            "#/default/analyze_door_batch_api_analyze_door_post"
+        ),
     }
 
 
+# =========================================================
+# Background door analysis
+# =========================================================
+
+def process_door_analysis(
+    job_id: str,
+    temp_paths: List[str],
+):
+    """
+    Performs the long-running Ollama analysis in the background.
+
+    The HTTP request that created the job has already returned,
+    so Cloudflare does not need to wait for Ollama.
+    """
+
+    try:
+
+        print("=" * 70)
+        print(
+            f"[JOB {job_id}] BACKGROUND ANALYSIS STARTED"
+        )
+        print("=" * 70)
+
+        print(
+            f"[JOB {job_id}] Image count: "
+            f"{len(temp_paths)}"
+        )
+
+        # -------------------------------------------------
+        # STEP 1: Vision AI / Ollama
+        # -------------------------------------------------
+
+        print(
+            f"[JOB {job_id}] STEP 1: Calling vision analyzer..."
+        )
+
+        profile = (
+            analyze_door_for_salto(
+                temp_paths
+            )
+        )
+
+        print(
+            f"[JOB {job_id}] STEP 1 COMPLETE: "
+            f"Vision analysis finished."
+        )
+
+        # -------------------------------------------------
+        # STEP 2: Deterministic compatibility engine
+        # -------------------------------------------------
+
+        print(
+            f"[JOB {job_id}] STEP 2: "
+            f"Evaluating compatibility..."
+        )
+
+        results = (
+            compatibility_engine.evaluate(
+                profile
+            )
+        )
+
+        print(
+            f"[JOB {job_id}] STEP 2 COMPLETE: "
+            f"{len(results)} product(s) evaluated."
+        )
+
+        # -------------------------------------------------
+        # STEP 3: Store completed result
+        # -------------------------------------------------
+
+        analysis_jobs[job_id] = {
+            "status": "completed",
+            "result": {
+                "profile":
+                    profile.model_dump(),
+
+                "recommendations":
+                    results,
+
+                "metadata": {
+                    "images_analyzed":
+                        len(temp_paths),
+
+                    "dataset":
+                        os.path.basename(
+                            DATASET_PATH
+                        ),
+
+                    "products_evaluated":
+                        len(results),
+
+                    "principle": (
+                        "Vision AI extracts observations; "
+                        "deterministic rules decide "
+                        "technical compatibility."
+                    ),
+                },
+            },
+            "error": None,
+        }
+
+        print("=" * 70)
+        print(
+            f"[JOB {job_id}] ANALYSIS COMPLETED"
+        )
+        print("=" * 70)
+
+    except Exception as error:
+
+        print("=" * 70)
+        print(
+            f"[JOB {job_id}] ANALYSIS FAILED"
+        )
+        print(
+            f"[JOB {job_id}] Error: {str(error)}"
+        )
+        print("=" * 70)
+
+        analysis_jobs[job_id] = {
+            "status": "failed",
+            "result": None,
+            "error": str(error),
+        }
+
+    finally:
+
+        # -------------------------------------------------
+        # IMPORTANT
+        #
+        # Images are deleted ONLY after Ollama has finished.
+        # -------------------------------------------------
+
+        print(
+            f"[JOB {job_id}] Cleaning up temporary images..."
+        )
+
+        for path in temp_paths:
+
+            if os.path.exists(path):
+
+                try:
+                    os.remove(path)
+
+                except OSError as cleanup_error:
+
+                    print(
+                        f"[JOB {job_id}] "
+                        f"Could not remove {path}: "
+                        f"{cleanup_error}"
+                    )
+
+
+# =========================================================
+# Start door analysis
+# =========================================================
+
 @app.post("/api/analyze-door")
 async def analyze_door_batch(
+    background_tasks: BackgroundTasks,
     files: Optional[List[UploadFile]] = File(None),
     file: Optional[UploadFile] = File(None),
 ):
+
     all_files: List[UploadFile] = []
+
     if files:
         all_files.extend(files)
+
     if file:
         all_files.append(file)
 
+    # -----------------------------------------------------
+    # Validate image count
+    # -----------------------------------------------------
+
     if not (1 <= len(all_files) <= 5):
+
         raise HTTPException(
             status_code=400,
             detail=(
-                f"Please provide 1-5 images under the 'files' field. "
+                f"Please provide 1-5 images under "
+                f"the 'files' field. "
                 f"Received {len(all_files)}."
             ),
         )
@@ -194,16 +404,36 @@ async def analyze_door_batch(
     temp_paths = []
 
     try:
+
+        # -------------------------------------------------
+        # STEP 1: Save uploaded images
+        # -------------------------------------------------
+
+        print("=" * 70)
+        print("[ANALYZE] Creating background analysis job")
+        print(
+            f"[ANALYZE] Received {len(all_files)} image(s)"
+        )
+        print("=" * 70)
+
         for file_item in all_files:
+
             file_item.file.seek(0, 2)
-            file_size = file_item.file.tell()
+
+            file_size = (
+                file_item.file.tell()
+            )
+
             file_item.file.seek(0)
 
             if file_size == 0:
+
                 raise HTTPException(
                     status_code=400,
                     detail=(
-                        f"Uploaded file '{file_item.filename or 'image'}' is empty (0 bytes). "
+                        f"Uploaded file "
+                        f"'{file_item.filename or 'image'}' "
+                        f"is empty (0 bytes). "
                         f"Please attach a valid image."
                     ),
                 )
@@ -233,61 +463,171 @@ async def analyze_door_batch(
                 temp_file.name
             )
 
-        profile = (
-            analyze_door_for_salto(
-                temp_paths
+            print(
+                f"[ANALYZE] Saved image: "
+                f"{temp_file.name}"
             )
+
+        # -------------------------------------------------
+        # STEP 2: Create job ID
+        # -------------------------------------------------
+
+        job_id = str(
+            uuid.uuid4()
         )
 
-        results = (
-            compatibility_engine.evaluate(
-                profile
-            )
+        analysis_jobs[job_id] = {
+            "status": "processing",
+            "result": None,
+            "error": None,
+        }
+
+        print("=" * 70)
+        print(
+            f"[JOB {job_id}] CREATED"
+        )
+        print(
+            f"[JOB {job_id}] Status: processing"
+        )
+        print("=" * 70)
+
+        # -------------------------------------------------
+        # STEP 3: Start background analysis
+        # -------------------------------------------------
+        #
+        # DO NOT analyze here.
+        #
+        # analyze_door_for_salto() can take >120 seconds.
+        #
+        # BackgroundTasks lets this HTTP request return
+        # immediately while the analysis continues.
+        #
+        # -------------------------------------------------
+
+        background_tasks.add_task(
+            process_door_analysis,
+            job_id,
+            temp_paths,
+        )
+
+        # -------------------------------------------------
+        # STEP 4: Return immediately
+        # -------------------------------------------------
+
+        print(
+            f"[JOB {job_id}] "
+            f"Returning response to client."
         )
 
         return {
-            "profile":
-                profile.model_dump(),
-
-            "recommendations":
-                results,
-
-            "metadata": {
-                "images_analyzed":
-                    len(temp_paths),
-
-                "dataset":
-                    os.path.basename(
-                        DATASET_PATH
-                    ),
-
-                "products_evaluated":
-                    len(results),
-
-                "principle": (
-                    "Vision AI extracts observations; "
-                    "deterministic rules decide "
-                    "technical compatibility."
-                ),
-            },
+            "jobId": job_id,
+            "status": "processing",
+            "message": (
+                "Door analysis has started. "
+                "Poll the job status endpoint "
+                "for the result."
+            ),
         }
 
     except HTTPException:
+
+        # If the background job was NOT started,
+        # clean up uploaded files here.
+
+        for path in temp_paths:
+
+            if os.path.exists(path):
+
+                try:
+                    os.remove(path)
+
+                except OSError:
+                    pass
+
         raise
 
     except Exception as error:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Door analysis failed: {str(error)}",
-        )
 
-    finally:
+        # Cleanup if job creation itself failed.
+
         for path in temp_paths:
+
             if os.path.exists(path):
+
                 try:
                     os.remove(path)
+
                 except OSError:
                     pass
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"Failed to start door analysis: "
+                f"{str(error)}"
+            ),
+        )
+
+
+# =========================================================
+# Get door analysis status/result
+# =========================================================
+
+@app.get("/api/analyze-door/{job_id}")
+async def get_analyze_door_status(
+    job_id: str,
+):
+
+    job = analysis_jobs.get(
+        job_id
+    )
+
+    # -----------------------------------------------------
+    # Job does not exist
+    # -----------------------------------------------------
+
+    if job is None:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Analysis job not found.",
+        )
+
+    # -----------------------------------------------------
+    # Still processing
+    # -----------------------------------------------------
+
+    if job["status"] == "processing":
+
+        return {
+            "jobId": job_id,
+            "status": "processing",
+            "message": (
+                "Door analysis is still running."
+            ),
+        }
+
+    # -----------------------------------------------------
+    # Failed
+    # -----------------------------------------------------
+
+    if job["status"] == "failed":
+
+        return {
+            "jobId": job_id,
+            "status": "failed",
+            "error": job["error"],
+        }
+
+    # -----------------------------------------------------
+    # Completed
+    # -----------------------------------------------------
+
+    return {
+        "jobId": job_id,
+        "status": "completed",
+        **job["result"],
+    }
 
 
 # =========================================================
@@ -298,19 +638,38 @@ async def analyze_door_batch(
 async def check_compatibility(
     request: CompatibilityRequest,
 ):
+
     try:
+
         profile_data = (
             request.profile.model_dump()
         )
 
-        if request.door_thickness_mm is not None:
-            profile_data["measured_thickness_mm"] = request.door_thickness_mm
+        if (
+            request.door_thickness_mm
+            is not None
+        ):
+            profile_data[
+                "measured_thickness_mm"
+            ] = request.door_thickness_mm
 
-        if request.backset_mm is not None:
-            profile_data["measured_backset_mm"] = request.backset_mm
+        if (
+            request.backset_mm
+            is not None
+        ):
+            profile_data[
+                "measured_backset_mm"
+            ] = request.backset_mm
 
-        if request.center_to_center_mm is not None:
-            profile_data["measured_center_to_center_mm"] = request.center_to_center_mm
+        if (
+            request.center_to_center_mm
+            is not None
+        ):
+            profile_data[
+                "measured_center_to_center_mm"
+            ] = (
+                request.center_to_center_mm
+            )
 
         profile = (
             DoorProfile.model_validate(
@@ -356,6 +715,7 @@ async def check_compatibility(
         raise
 
     except Exception as error:
+
         raise HTTPException(
             status_code=500,
             detail=str(error),
@@ -370,14 +730,24 @@ async def check_compatibility(
 async def recommend_products(
     request: ManualDoorRecommendationRequest,
 ):
+
     try:
+
         if request.door_thickness_mm <= 0:
+
             raise HTTPException(
                 status_code=400,
-                detail="Door thickness must be greater than 0 mm.",
+                detail=(
+                    "Door thickness must be "
+                    "greater than 0 mm."
+                ),
             )
 
-        profile = build_manual_door_profile(request)
+        profile = (
+            build_manual_door_profile(
+                request
+            )
+        )
 
         recommendations = (
             compatibility_engine.evaluate(
@@ -418,6 +788,7 @@ async def recommend_products(
         raise
 
     except Exception as error:
+
         raise HTTPException(
             status_code=500,
             detail=str(error),
@@ -432,45 +803,118 @@ def build_manual_door_profile(
     request: ManualDoorRecommendationRequest,
 ) -> DoorProfile:
 
-    lock_type = map_manual_lock_type(request.existing_lock)
-    door_standard = map_manual_door_standard(request.existing_lock)
-    thickness_class = map_thickness_class(request.door_thickness_mm)
+    lock_type = (
+        map_manual_lock_type(
+            request.existing_lock
+        )
+    )
+
+    door_standard = (
+        map_manual_door_standard(
+            request.existing_lock
+        )
+    )
+
+    thickness_class = (
+        map_thickness_class(
+            request.door_thickness_mm
+        )
+    )
 
     return DoorProfile(
-        door_material=map_manual_door_material(request.door_material),
+
+        door_material=(
+            map_manual_door_material(
+                request.door_material
+            )
+        ),
+
         material_confidence=1.0,
+
         door_style=request.door_type,
+
         door_standard=door_standard,
+
         door_standard_confidence=1.0,
+
         handing=Handing.UNKNOWN,
+
         handing_confidence=1.0,
-        approx_thickness_class=thickness_class,
-        stile_width_class=StileWidthClass.UNKNOWN,
+
+        approx_thickness_class=(
+            thickness_class
+        ),
+
+        stile_width_class=(
+            StileWidthClass.UNKNOWN
+        ),
+
         lock=LockObs(
+
             detected=True,
+
             confidence=1.0,
-            visual_evidence=f"Manual selection: {request.existing_lock}",
+
+            visual_evidence=(
+                f"Manual selection: "
+                f"{request.existing_lock}"
+            ),
+
             lock_type=lock_type,
-            cylinder_visible=lock_type in [LockType.EURO_CYLINDER, LockType.RIM_CYLINDER],
-            deadbolt_present=lock_type in [
-                LockType.MECHANICAL_DEADBOLT,
-                LockType.INTERCONNECTED_DEADBOLT,
-                LockType.RIM_CYLINDER,
-            ],
+
+            cylinder_visible=(
+                lock_type
+                in [
+                    LockType.EURO_CYLINDER,
+                    LockType.RIM_CYLINDER,
+                ]
+            ),
+
+            deadbolt_present=(
+                lock_type
+                in [
+                    LockType.MECHANICAL_DEADBOLT,
+                    LockType.INTERCONNECTED_DEADBOLT,
+                    LockType.RIM_CYLINDER,
+                ]
+            ),
         ),
+
         frame=ComponentObs(
+
             detected=True,
+
             confidence=1.0,
-            visual_evidence=f"Manual selection: {request.frame_type}",
+
+            visual_evidence=(
+                f"Manual selection: "
+                f"{request.frame_type}"
+            ),
         ),
+
         handle=ComponentObs(
+
             detected=False,
+
             confidence=1.0,
-            visual_evidence="Handle details were not provided in manual flow.",
+
+            visual_evidence=(
+                "Handle details were not "
+                "provided in manual flow."
+            ),
         ),
-        measured_thickness_mm=request.door_thickness_mm,
-        measured_backset_mm=request.backset_mm,
-        measured_center_to_center_mm=request.center_to_center_mm,
+
+        measured_thickness_mm=(
+            request.door_thickness_mm
+        ),
+
+        measured_backset_mm=(
+            request.backset_mm
+        ),
+
+        measured_center_to_center_mm=(
+            request.center_to_center_mm
+        ),
     )
 
 
@@ -478,17 +922,33 @@ def build_manual_door_profile(
 # Manual lock mapping
 # =========================================================
 
-def map_manual_lock_type(value: str) -> LockType:
-    normalized = value.strip().lower().replace("-", "_")
+def map_manual_lock_type(
+    value: str,
+) -> LockType:
+
+    normalized = (
+        value
+        .strip()
+        .lower()
+        .replace("-", "_")
+    )
 
     if "interconnected" in normalized:
-        return LockType.INTERCONNECTED_DEADBOLT
+        return (
+            LockType.INTERCONNECTED_DEADBOLT
+        )
 
-    if "surface" in normalized or "rim" in normalized or "night latch" in normalized:
+    if (
+        "surface" in normalized
+        or "rim" in normalized
+        or "night latch" in normalized
+    ):
         return LockType.RIM_CYLINDER
 
     if "deadbolt" in normalized:
-        return LockType.MECHANICAL_DEADBOLT
+        return (
+            LockType.MECHANICAL_DEADBOLT
+        )
 
     if "euro" in normalized:
         return LockType.EURO_CYLINDER
@@ -505,7 +965,10 @@ def map_manual_lock_type(value: str) -> LockType:
     if "mortise" in normalized:
         return LockType.MORTISE
 
-    if "cylindrical" in normalized or "knob" in normalized:
+    if (
+        "cylindrical" in normalized
+        or "knob" in normalized
+    ):
         return LockType.CYLINDRICAL_KNOB
 
     if "lever" in normalized:
@@ -518,13 +981,24 @@ def map_manual_lock_type(value: str) -> LockType:
 # Manual door standard mapping
 # =========================================================
 
-def map_manual_door_standard(existing_lock: str) -> DoorStandard:
-    normalized = existing_lock.strip().lower()
+def map_manual_door_standard(
+    existing_lock: str,
+) -> DoorStandard:
+
+    normalized = (
+        existing_lock
+        .strip()
+        .lower()
+    )
 
     if "interconnected" in normalized:
         return DoorStandard.US_INTERCONNECTED
 
-    if "surface" in normalized or "rim" in normalized or "night latch" in normalized:
+    if (
+        "surface" in normalized
+        or "rim" in normalized
+        or "night latch" in normalized
+    ):
         return DoorStandard.SURFACE_RIM_LOCK
 
     if "deadbolt" in normalized:
@@ -542,12 +1016,18 @@ def map_manual_door_standard(existing_lock: str) -> DoorStandard:
         or "lever" in normalized
         or "tubular" in normalized
     ):
-        return DoorStandard.CYLINDRICAL_KNOB_OR_LEVER
+        return (
+            DoorStandard.CYLINDRICAL_KNOB_OR_LEVER
+        )
 
     if "passage" in normalized:
-        return DoorStandard.PASSAGE_LATCH_EURO
+        return (
+            DoorStandard.PASSAGE_LATCH_EURO
+        )
 
-    # Manual UI default is "Mortise" — treat as European mortise prep.
+    # Manual UI default is "Mortise" —
+    # treat as European mortise prep.
+
     if "mortise" in normalized:
         return DoorStandard.EURO_PROFILE
 
@@ -558,16 +1038,32 @@ def map_manual_door_standard(existing_lock: str) -> DoorStandard:
 # Manual door material mapping
 # =========================================================
 
-def map_manual_door_material(value: str) -> DoorMaterial:
-    normalized = value.strip().lower()
+def map_manual_door_material(
+    value: str,
+) -> DoorMaterial:
 
-    if "wood" in normalized or "timber" in normalized or "laminate" in normalized:
+    normalized = (
+        value
+        .strip()
+        .lower()
+    )
+
+    if (
+        "wood" in normalized
+        or "timber" in normalized
+        or "laminate" in normalized
+    ):
         return DoorMaterial.WOOD
 
     if "glass" in normalized:
         return DoorMaterial.GLASS
 
-    if "metal" in normalized or "steel" in normalized or "aluminium" in normalized or "aluminum" in normalized:
+    if (
+        "metal" in normalized
+        or "steel" in normalized
+        or "aluminium" in normalized
+        or "aluminum" in normalized
+    ):
         return DoorMaterial.METAL
 
     return DoorMaterial.UNKNOWN
@@ -577,14 +1073,25 @@ def map_manual_door_material(value: str) -> DoorMaterial:
 # Thickness classification
 # =========================================================
 
-def map_thickness_class(thickness_mm: float) -> ThicknessClass:
+def map_thickness_class(
+    thickness_mm: float,
+) -> ThicknessClass:
+
     if thickness_mm < 35:
-        return ThicknessClass.THIN_UNDER_35MM
+        return (
+            ThicknessClass.THIN_UNDER_35MM
+        )
 
     if thickness_mm <= 55:
-        return ThicknessClass.STANDARD_35_55MM
+        return (
+            ThicknessClass.STANDARD_35_55MM
+        )
 
     if thickness_mm <= 85:
-        return ThicknessClass.THICK_55_85MM
+        return (
+            ThicknessClass.THICK_55_85MM
+        )
 
-    return ThicknessClass.OVER_85MM
+    return (
+        ThicknessClass.OVER_85MM
+    )

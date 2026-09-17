@@ -4,14 +4,25 @@ import {
 } from '@angular/common/http';
 import {
   Observable,
-  tap,
+  of,
+  throwError,
+  timer,
 } from 'rxjs';
+import {
+  catchError,
+  filter,
+  switchMap,
+  take,
+  tap,
+} from 'rxjs/operators';
+
 
 export interface DoorVisionComponent {
   detected: boolean;
   confidence: number;
   visual_evidence: string;
 }
+
 
 export interface DoorVisionLock
   extends DoorVisionComponent {
@@ -20,11 +31,13 @@ export interface DoorVisionLock
   deadbolt_present: boolean;
 }
 
+
 export interface DoorVisionHandle
   extends DoorVisionComponent {
   handle_position: string;
   handle_type: string;
 }
+
 
 export interface DoorVisionProfile {
   door_material: string;
@@ -55,6 +68,7 @@ export interface DoorVisionProfile {
   measured_center_to_center_mm: number | null;
 }
 
+
 export interface DoorVisionRecommendation {
   product_id: string;
 
@@ -74,6 +88,7 @@ export interface DoorVisionRecommendation {
   source_document: string;
 }
 
+
 export interface DoorVisionMetadata {
   images_analyzed: number;
 
@@ -84,12 +99,14 @@ export interface DoorVisionMetadata {
   principle: string;
 }
 
+
 export interface TargetPlacement {
   x: number;
   y: number;
   is_left: boolean;
   type?: string;
 }
+
 
 export interface DoorVisionResult {
   profile: DoorVisionProfile;
@@ -103,6 +120,29 @@ export interface DoorVisionResult {
 
   target_placement?: TargetPlacement | null;
 }
+
+
+// =========================================================
+// Background analysis response
+// =========================================================
+
+export interface DoorVisionAnalysisJob {
+  jobId: string;
+
+  status:
+    | 'processing'
+    | 'completed'
+    | 'failed';
+
+  message?: string;
+
+  error?: string;
+}
+
+
+// =========================================================
+// Manual recommendation
+// =========================================================
 
 export interface ManualDoorRecommendationRequest {
   door_material:
@@ -123,6 +163,11 @@ export interface ManualDoorRecommendationRequest {
   center_to_center_mm?: number;
 }
 
+
+// =========================================================
+// Compatibility request
+// =========================================================
+
 export interface CheckCompatibilityRequest {
   profile: DoorVisionProfile;
 
@@ -132,11 +177,13 @@ export interface CheckCompatibilityRequest {
 
   center_to_center_mm?: number | null;
 
-  // When the customer confirms/corrects the AI-detected lock type on the
-  // "here's what we found" screen, this overrides profile.lock/door_standard
+  // When the customer confirms/corrects the AI-detected
+  // lock type on the "here's what we found" screen,
+  // this overrides profile.lock/door_standard
   // server-side using the same mapping the manual flow uses.
   existing_lock?: string;
 }
+
 
 @Injectable({
   providedIn: 'root',
@@ -144,44 +191,132 @@ export interface CheckCompatibilityRequest {
 export class DoorVisionService {
 
   private get apiUrl(): string {
+
     // if (typeof window !== 'undefined') {
     //   return '/api';
     // }
+
     return 'https://retrofit-angular1-production.up.railway.app/api';
   }
 
 
-  private lastResult: DoorVisionResult | null = null;
-  private readonly CACHE_KEY = 'retrofit-last-analysis-result';
+  // =======================================================
+  // Last completed analysis
+  // =======================================================
+
+  private lastResult:
+    DoorVisionResult | null = null;
+
+  private readonly CACHE_KEY =
+    'retrofit-last-analysis-result';
+
+
+  // =======================================================
+  // Polling configuration
+  // =======================================================
+
+  /**
+   * How often Angular checks whether Ollama has finished.
+   *
+   * Ollama can take several minutes, but each polling
+   * request is very short and therefore does not hit
+   * Cloudflare's 120 second timeout.
+   */
+private readonly POLL_INTERVAL_MS = 15000;
+
+  /**
+   * Maximum number of polling attempts.
+   *
+   * 600 attempts x 3 seconds = 30 minutes.
+   *
+   * This is intentionally generous because the local
+   * Ollama machine may take several minutes to analyse
+   * an image.
+   */
+  private readonly MAX_POLL_ATTEMPTS = 600;
+
 
   constructor(
     private readonly http: HttpClient,
   ) {}
 
-  setLastResult(result: DoorVisionResult): void {
+
+  // =======================================================
+  // Cache result
+  // =======================================================
+
+  setLastResult(
+    result: DoorVisionResult,
+  ): void {
+
     this.lastResult = result;
+
     try {
-      sessionStorage.setItem(this.CACHE_KEY, JSON.stringify(result));
+
+      sessionStorage.setItem(
+        this.CACHE_KEY,
+        JSON.stringify(result),
+      );
+
     } catch {
+
       // Ignore storage errors
+
     }
   }
 
-  getLastResult(): DoorVisionResult | null {
+
+  // =======================================================
+  // Get cached result
+  // =======================================================
+
+  getLastResult():
+    DoorVisionResult | null {
+
     if (this.lastResult) {
       return this.lastResult;
     }
+
     try {
-      const stored = sessionStorage.getItem(this.CACHE_KEY);
+
+      const stored =
+        sessionStorage.getItem(
+          this.CACHE_KEY,
+        );
+
       if (stored) {
-        this.lastResult = JSON.parse(stored);
+
+        this.lastResult =
+          JSON.parse(stored);
+
         return this.lastResult;
       }
+
     } catch {
+
       // Ignore storage errors
+
     }
+
     return null;
   }
+
+
+  // =======================================================
+  // Analyze door
+  // =======================================================
+  //
+  // NEW FLOW:
+  //
+  // 1. Upload images
+  // 2. Backend immediately returns jobId
+  // 3. Angular polls the job
+  // 4. Backend eventually returns DoorVisionResult
+  //
+  // Ollama can take >120 seconds because Angular is no
+  // longer waiting on the original POST request.
+  //
+  // =======================================================
 
   analyzeDoor(
     files: File[],
@@ -191,29 +326,298 @@ export class DoorVisionService {
       files.length < 1 ||
       files.length > 5
     ) {
-      throw new Error(
-        'Please provide between 1 and 5 images.',
+
+      return throwError(
+        () =>
+          new Error(
+            'Please provide between 1 and 5 images.',
+          ),
       );
     }
+
 
     const formData =
       new FormData();
 
-    files.forEach(file => {
-      formData.append(
-        'files',
-        file,
-        file.name,
-      );
-    });
 
-    return this.http.post<DoorVisionResult>(
+    files.forEach(
+      file => {
+
+        formData.append(
+          'files',
+          file,
+          file.name,
+        );
+
+      },
+    );
+
+
+    // -------------------------------------------------------
+    // STEP 1
+    // Upload image and start background job
+    // -------------------------------------------------------
+
+    return this.http.post<DoorVisionAnalysisJob>(
       `${this.apiUrl}/analyze-door`,
       formData,
     ).pipe(
-      tap(result => this.setLastResult(result))
+
+      switchMap(
+        job => {
+
+          if (
+            !job ||
+            !job.jobId
+          ) {
+
+            return throwError(
+              () =>
+                new Error(
+                  'Door analysis did not return a valid job ID.',
+                ),
+            );
+          }
+
+
+          console.log(
+            '[DoorVision] Analysis job started:',
+            job.jobId,
+          );
+
+
+          // -------------------------------------------------
+          // STEP 2
+          // Poll the job until it completes
+          // -------------------------------------------------
+
+          return this.pollAnalysisJob(
+            job.jobId,
+          );
+
+        },
+      ),
+
+      // -----------------------------------------------------
+      // STEP 3
+      // Save completed result
+      // -----------------------------------------------------
+
+      tap(
+        result => {
+
+          console.log(
+            '[DoorVision] Analysis completed.',
+          );
+
+          this.setLastResult(
+            result,
+          );
+
+        },
+      ),
+
     );
   }
+
+
+  // =======================================================
+  // Poll background analysis job
+  // =======================================================
+
+  private pollAnalysisJob(
+    jobId: string,
+  ): Observable<DoorVisionResult> {
+
+    let attempts = 0;
+
+
+    return timer(
+      0,
+      this.POLL_INTERVAL_MS,
+    ).pipe(
+
+      switchMap(
+        () => {
+
+          attempts++;
+
+          console.log(
+            `[DoorVision] Checking analysis job ` +
+            `${jobId} ` +
+            `(attempt ${attempts})`,
+          );
+
+
+          return this.http.get<
+            DoorVisionAnalysisJob &
+            Partial<DoorVisionResult>
+          >(
+            `${this.apiUrl}/analyze-door/${jobId}`,
+          );
+
+        },
+      ),
+
+
+      switchMap(
+        response => {
+
+          // -------------------------------------------------
+          // Still processing
+          // -------------------------------------------------
+
+          if (
+            response.status === 'processing'
+          ) {
+
+            console.log(
+              `[DoorVision] Job ${jobId} ` +
+              `is still processing.`,
+            );
+
+            return of(null);
+          }
+
+
+          // -------------------------------------------------
+          // Analysis failed
+          // -------------------------------------------------
+
+          if (
+            response.status === 'failed'
+          ) {
+
+            console.error(
+              `[DoorVision] Job ${jobId} failed:`,
+              response.error,
+            );
+
+            return throwError(
+              () =>
+                new Error(
+                  response.error ||
+                  'Door analysis failed.',
+                ),
+            );
+          }
+
+
+          // -------------------------------------------------
+          // Analysis completed
+          // -------------------------------------------------
+
+          if (
+            response.status === 'completed'
+          ) {
+
+            if (
+              !response.profile ||
+              !response.recommendations ||
+              !response.metadata
+            ) {
+
+              return throwError(
+                () =>
+                  new Error(
+                    'Door analysis completed but returned an invalid result.',
+                  ),
+              );
+            }
+
+
+            const result:
+              DoorVisionResult = {
+
+              profile:
+                response.profile,
+
+              recommendations:
+                response.recommendations,
+
+              metadata:
+                response.metadata,
+
+              clean_door_image:
+                response.clean_door_image ??
+                null,
+
+              target_placement:
+                response.target_placement ??
+                null,
+            };
+
+
+            console.log(
+              `[DoorVision] Job ${jobId} completed.`,
+            );
+
+
+            return of(result);
+          }
+
+
+          // -------------------------------------------------
+          // Unexpected status
+          // -------------------------------------------------
+
+          return throwError(
+            () =>
+              new Error(
+                `Unknown analysis job status: ${response.status}`,
+              ),
+          );
+
+        },
+      ),
+
+
+      // -----------------------------------------------------
+      // Continue polling while result is null
+      // -----------------------------------------------------
+
+      filter(
+        (
+          result,
+        ): result is DoorVisionResult =>
+          result !== null,
+      ),
+
+
+      // -----------------------------------------------------
+      // Safety limit
+      // -----------------------------------------------------
+
+      take(
+        this.MAX_POLL_ATTEMPTS,
+      ),
+
+
+      // -----------------------------------------------------
+      // If polling finishes without a result
+      // -----------------------------------------------------
+
+      catchError(
+        error => {
+
+          console.error(
+            '[DoorVision] Polling failed:',
+            error,
+          );
+
+          return throwError(
+            () => error,
+          );
+        },
+      ),
+
+    );
+  }
+
+
+  // =======================================================
+  // Check compatibility after scanned door
+  // =======================================================
 
   checkCompatibility(
     request: CheckCompatibilityRequest,
@@ -223,32 +627,87 @@ export class DoorVisionService {
       `${this.apiUrl}/check-compatibility`,
       request,
     ).pipe(
-      tap(result => this.setLastResult(result))
+
+      tap(
+        result =>
+          this.setLastResult(
+            result,
+          ),
+      ),
+
     );
   }
 
+
+  // =======================================================
+  // Manual product recommendation
+  // =======================================================
+
   recommendProducts(
     request:
-    ManualDoorRecommendationRequest,
+      ManualDoorRecommendationRequest,
   ): Observable<DoorVisionResult> {
 
     return this.http.post<DoorVisionResult>(
       `${this.apiUrl}/recommend-products`,
       request,
     ).pipe(
-      tap(result => this.setLastResult(result))
+
+      tap(
+        result =>
+          this.setLastResult(
+            result,
+          ),
+      ),
+
     );
   }
 
-  cleanDoor(file: File, handing: string = 'right_hand'): Observable<{ clean_door_image: string; target_placement?: TargetPlacement | null }> {
-    const formData = new FormData();
-    formData.append('file', file, file.name);
-    formData.append('handing', handing);
-    return this.http.post<{ clean_door_image: string; target_placement?: TargetPlacement | null }>(
+
+  // =======================================================
+  // Clean door
+  // =======================================================
+
+  cleanDoor(
+    file: File,
+    handing: string = 'right_hand',
+  ): Observable<{
+    clean_door_image: string;
+    target_placement?:
+      TargetPlacement | null;
+  }> {
+
+    const formData =
+      new FormData();
+
+
+    formData.append(
+      'file',
+      file,
+      file.name,
+    );
+
+
+    formData.append(
+      'handing',
+      handing,
+    );
+
+
+    return this.http.post<{
+      clean_door_image: string;
+      target_placement?:
+        TargetPlacement | null;
+    }>(
       `${this.apiUrl}/clean-door`,
       formData,
     );
   }
+
+
+  // =======================================================
+  // Health check
+  // =======================================================
 
   healthCheck(): Observable<{
     status: string;
@@ -264,4 +723,5 @@ export class DoorVisionService {
       `${this.apiUrl}/health`,
     );
   }
+
 }
