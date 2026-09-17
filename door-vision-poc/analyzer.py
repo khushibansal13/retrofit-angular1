@@ -15,7 +15,7 @@ MODEL_NAME = os.environ.get(
 # Ollama running locally, exposed to Railway through Cloudflare Tunnel
 OLLAMA_HOST = os.environ.get(
     "OLLAMA_HOST",
-    "https://but-originally-breakdown-existed.trycloudflare.com",
+    "http://localhost:11434",
 )
 
 ollama_client = Client(host=OLLAMA_HOST)
@@ -204,9 +204,9 @@ def analyze_door_for_salto(image_paths: List[str]) -> DoorProfile:
                 },
             ],
             format=DoorProfile.model_json_schema(),
-           options={
+options={
     "temperature": 0.0,
-    "num_ctx": 4096,
+    "num_ctx": 8192,
 },
             keep_alive="30m",
         )
