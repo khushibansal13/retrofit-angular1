@@ -3,3 +3,4 @@ uvicorn
 Pillow
 ollama
 python-multipart
+requests
