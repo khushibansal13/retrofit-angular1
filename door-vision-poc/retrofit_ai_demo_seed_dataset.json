@@ -45,7 +45,8 @@
       "source_documents": [
         "DLokEuro_Datasheet_en.pdf",
         "dlok_1_290_11_258_275.pdf"
-      ]
+      ],
+      "image_url": "/locks/salto_dlok_euro.png"
     },
     {
       "product_id": "salto_dbolt_touch",
@@ -97,7 +98,8 @@
       ],
       "source_documents": [
         "DBoltTouch_Datasheet_en.pdf"
-      ]
+      ],
+      "image_url": "/locks/salto_dbolt_touch.png"
     },
     {
       "product_id": "salto_dbolt_touch_ic",
@@ -156,7 +158,8 @@
       ],
       "source_documents": [
         "DBolt Touch Interconnected | Tech. Specs"
-      ]
+      ],
+      "image_url": "/locks/salto_dbolt_touch_ic.png"
     },
     {
       "product_id": "salto_xs4_original_plus_ansi",
@@ -192,7 +195,8 @@
       "source_documents": [
         "XS4Original+ANSI_Datasheet_en.pdf",
         "inst_guide_xs4_original_plus_ai6xx_226844_1.pdf"
-      ]
+      ],
+      "image_url": "/locks/salto_xs4_original_plus_ansi.png"
     },
     {
       "product_id": "salto_xs4_original_plus_euro",
@@ -227,7 +231,8 @@
       "source_documents": [
         "XS4Original+EURO_Datasheet_en.pdf",
         "inst_guide_xs4_original_plus_ei6xx_226864_0.pdf"
-      ]
+      ],
+      "image_url": "/locks/salto_xs4_original_plus_euro.png"
     }
   ],
   "vision_observations": {

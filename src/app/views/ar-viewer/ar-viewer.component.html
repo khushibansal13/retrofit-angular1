@@ -1,4 +1,4 @@
-﻿<div class="ar-page">
+<div class="ar-page">
 
   <!-- Header -->
   <header class="ar-header">
@@ -22,49 +22,62 @@
   <!-- Main content -->
   <main class="ar-content">
 
-    <!-- No door image -->
-    <section
-      class="empty-state"
-      *ngIf="!hasDoorImage()"
-    >
-      <div class="empty-icon">
-        📷
-      </div>
-
-      <h2>No door photo available</h2>
-
-      <p>
-        Go back to the configuration wizard and upload a photo of your door.
-      </p>
-    </section>
-
-
     <!-- AR experience -->
-    <section
-      class="ar-layout"
-      *ngIf="hasDoorImage()"
-    >
+    <section class="ar-layout">
 
       <!-- Stage -->
       <div class="stage-card">
 
         <div class="stage-toolbar">
 
-          <div>
-            <strong>Door preview</strong>
+          <div class="toolbar-left">
+            <div class="door-status-pill" [class.custom]="isCustomDoor">
+              <mat-icon>{{ isCustomDoor ? 'check_circle' : 'photo' }}</mat-icon>
+              <span>{{ isCustomDoor ? 'Your Uploaded Door' : 'Default Door Preview' }}</span>
+            </div>
 
-            <span>
-              Drag the lock to position it
-            </span>
+            <button type="button" class="upload-link-button" (click)="triggerDoorUpload()">
+              <mat-icon>upload_file</mat-icon> Change door photo
+            </button>
+            <input
+              #doorFileInput
+              type="file"
+              accept="image/*"
+              style="display: none;"
+              (change)="onDoorPhotoSelected($event)"
+            />
           </div>
 
-          <button
-            type="button"
-            class="reset-button"
-            (click)="resetPlacement()"
-          >
-            Reset
-          </button>
+          <div class="toolbar-right">
+            <div class="mode-toggle">
+              <button
+                type="button"
+                class="mode-btn"
+                [class.active]="displayMode === '3d'"
+                (click)="setDisplayMode('3d')"
+                title="Interactive 3D Model"
+              >
+                <mat-icon>view_in_ar</mat-icon> 3D Model
+              </button>
+              <button
+                type="button"
+                class="mode-btn"
+                [class.active]="displayMode === '2d'"
+                (click)="setDisplayMode('2d')"
+                title="Photo render overlay"
+              >
+                <mat-icon>photo</mat-icon> 2D Photo
+              </button>
+            </div>
+
+            <button
+              type="button"
+              class="reset-button"
+              (click)="resetPlacement()"
+            >
+              Reset
+            </button>
+          </div>
 
         </div>
 
@@ -72,52 +85,110 @@
         <div
           #stage
           class="ar-stage"
+          [class.is-placed]="isPlaced"
+          (click)="onStageClick($event)"
           (pointermove)="onDrag($event)"
           (pointerup)="stopDrag()"
           (pointercancel)="stopDrag()"
         >
 
-          <!-- Real customer door photo -->
+          <!-- Top Stage Placement Guide -->
+          <div class="stage-guide-badge" [class.is-placed]="isPlaced">
+            <mat-icon>{{ isPlaced ? 'check_circle' : 'touch_app' }}</mat-icon>
+            <span>
+              {{ isPlaced ? (productName + ' placed on door • Click anywhere to reposition') : ('Click anywhere on door to place ' + productName) }}
+            </span>
+          </div>
+
+          <!-- Click Ripple Pulse Animation -->
+          @if (rippleActive) {
+            <div
+              class="placement-ripple"
+              [style.left]="rippleCoords.x + '%'"
+              [style.top]="rippleCoords.y + '%'"
+            ></div>
+          }
+
+          <!-- Customer Door Photo -->
           <img
             class="door-image"
-            [src]="doorImageUrl!"
+            [src]="doorImageUrl"
             alt="Your door"
           />
-
 
           <!-- Dark overlay -->
           <div class="stage-overlay"></div>
 
-
           <!-- Product overlay -->
           <div
             class="product-placement"
+            [ngClass]="getProductPlacementClass()"
+            [class.is-3d]="displayMode === '3d'"
+            [class.animate-pop]="justPlaced"
             [style.left]="placementLeft"
             [style.top]="placementTop"
             [style.transform]="placementTransform"
-            (pointerdown)="startDrag($event)"
+            (click)="$event.stopPropagation()"
           >
+
+            <!-- Lock Tag on Door -->
+            <div class="lock-placement-badge">
+              <span class="badge-brand">SALTO</span>
+              <span class="badge-model">{{ productName }}</span>
+              @if (productFinish) {
+                <span class="badge-finish">• {{ productFinish }}</span>
+              }
+            </div>
+
+            <!-- Drag Handle -->
+            <div
+              class="placement-drag-handle"
+              (pointerdown)="startDrag($event)"
+              title="Drag to adjust lock position on your door"
+            >
+              <mat-icon>open_with</mat-icon>
+              <span>Drag to Adjust</span>
+            </div>
 
             <div class="placement-ring"></div>
 
-            <img
-              class="product-image"
-              [src]="productImage"
-              [alt]="productName"
-              draggable="false"
-            />
-
-            <div class="drag-label">
-              Drag to move
-            </div>
+            <!-- 3D Model View -->
+            @if (displayMode === '3d') {
+              <model-viewer
+                class="model-3d-element"
+                [class.flipped]="flipHorizontal"
+                [src]="modelUrl"
+                alt="SALTO Smart Lock 3D Model"
+                camera-controls
+                camera-orbit="0deg 90deg auto"
+                min-camera-orbit="auto 60deg auto"
+                max-camera-orbit="auto 120deg auto"
+                touch-action="pan-y"
+                ar
+                ar-modes="webxr scene-viewer quick-look"
+                shadow-intensity="1.2"
+                environment-image="neutral"
+                exposure="1.0"
+              >
+              </model-viewer>
+            } @else {
+              <!-- 2D Photo View -->
+              <img
+                class="product-image"
+                [class.flipped]="flipHorizontal"
+                (pointerdown)="startDrag($event)"
+                [src]="productImage"
+                [alt]="productName"
+                draggable="false"
+              />
+            }
 
           </div>
 
-
           <!-- Measurement hint -->
           <div class="placement-hint">
-            <span class="hint-icon">✦</span>
-            Move the lock to the existing lock position
+            <span class="hint-icon">🎯</span>
+            <span>Click anywhere on your door to place the lock • Drag to adjust position • Orbit 3D</span>
           </div>
 
         </div>
@@ -168,6 +239,18 @@
             ↷
           </button>
 
+          <div class="control-divider"></div>
+
+          <button
+            type="button"
+            class="control-button flip-btn"
+            [class.active]="flipHorizontal"
+            (click)="toggleHanding()"
+            title="Flip handle direction (Left / Right door handing)"
+          >
+            <mat-icon>swap_horiz</mat-icon>
+          </button>
+
         </div>
 
       </div>
@@ -190,7 +273,7 @@
 
             <div class="product-thumbnail">
               <img
-                [src]="selectedProduct.imageUrl"
+                [src]="productImage"
                 [alt]="selectedProduct.name"
               />
             </div>
@@ -205,8 +288,60 @@
                 {{ selectedProduct.name }}
               </div>
 
-              <div class="product-finish">
-                {{ productFinish }}
+              <!-- Finish Picker Chips -->
+              <div class="finish-selector">
+                <div class="finish-label-row">
+                  <span class="finish-label">Finish:</span>
+                  <span class="active-finish-name">{{ productFinish }}</span>
+                </div>
+
+                <div class="finish-chips">
+                  @for (finish of selectedProduct.finishes; track finish) {
+                    <button
+                      type="button"
+                      class="finish-chip"
+                      [class.selected]="productFinish === finish"
+                      (click)="selectFinish(finish)"
+                    >
+                      <span
+                        class="finish-color-dot"
+                        [style.background]="getFinishColor(finish)"
+                      ></span>
+                      {{ finish }}
+                    </button>
+                  }
+                </div>
+              </div>
+
+              <!-- Handing Selector -->
+              <div class="finish-selector" style="margin-top: 8px;">
+                <div class="finish-label-row">
+                  <span class="finish-label">Door Handing:</span>
+                  <span class="active-finish-name">{{ flipHorizontal ? 'Left Hand (Inward)' : 'Right Hand (Inward)' }}</span>
+                </div>
+
+                <div class="finish-chips">
+                  <button
+                    type="button"
+                    class="finish-chip"
+                    [class.selected]="!flipHorizontal"
+                    (click)="setHanding(false)"
+                    title="Right-handed installation (handle points right)"
+                  >
+                    <mat-icon style="font-size: 13px; width: 13px; height: 13px; vertical-align: middle;">arrow_forward</mat-icon>
+                    Right Hand
+                  </button>
+                  <button
+                    type="button"
+                    class="finish-chip"
+                    [class.selected]="flipHorizontal"
+                    (click)="setHanding(true)"
+                    title="Left-handed installation (handle points left)"
+                  >
+                    <mat-icon style="font-size: 13px; width: 13px; height: 13px; vertical-align: middle;">arrow_back</mat-icon>
+                    Left Hand
+                  </button>
+                </div>
               </div>
 
             </div>
@@ -220,7 +355,7 @@
         <section class="panel-card">
 
           <div class="panel-title">
-            How to use
+            How to Place in AR
           </div>
 
           <div class="instruction">
@@ -230,10 +365,10 @@
             </span>
 
             <div>
-              <strong>Position</strong>
+              <strong>Click on Door</strong>
 
               <p>
-                Drag the lock onto the existing lock position.
+                Click or tap anywhere on your door image to place the lock right there.
               </p>
             </div>
 
@@ -247,10 +382,10 @@
             </span>
 
             <div>
-              <strong>Resize</strong>
+              <strong>Drag & Orbit in 3D</strong>
 
               <p>
-                Use + and − to adjust the visual size.
+                Drag the handle to fine-tune the position. Click and drag on the 3D lock to view in 360°.
               </p>
             </div>
 
@@ -264,10 +399,10 @@
             </span>
 
             <div>
-              <strong>Rotate</strong>
+              <strong>Scale & Switch Finish</strong>
 
               <p>
-                Rotate the lock if your door handing requires it.
+                Use + and − to scale lock dimensions, and switch finishes or lock models anytime.
               </p>
             </div>
 
@@ -285,28 +420,24 @@
 
           <div class="product-list">
 
-            <button
-              type="button"
-              class="product-option"
-              *ngFor="let product of [
-        ALL_PRODUCTS[0],
-        ALL_PRODUCTS[1],
-        ALL_PRODUCTS[2],
-        ALL_PRODUCTS[3],
-        ALL_PRODUCTS[4]
-      ]"
-              [class.active]="selectedProduct?.id === product.id"
-              (click)="selectProduct(product)"
-            >
-              <img
-                [src]="product.imageUrl"
-                [alt]="product.name"
-              />
+            @for (product of ALL_PRODUCTS; track product.id) {
+              <button
+                type="button"
+                class="product-option"
+                [class.active]="selectedProduct?.id === product.id"
+                (click)="selectProduct(product)"
+              >
+                <img
+                  [src]="product.imageUrl"
+                  [alt]="product.name"
+                />
 
-              <span>
-        {{ product.name }}
-      </span>
-            </button>
+                <div class="product-option-meta">
+                  <span class="option-name">{{ product.name }}</span>
+                  <span class="option-badge">{{ product.badge || product.doorProfile }}</span>
+                </div>
+              </button>
+            }
 
           </div>
 

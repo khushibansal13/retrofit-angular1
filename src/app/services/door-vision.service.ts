@@ -1,4 +1,4 @@
-﻿import { Injectable } from '@angular/core';
+import { Injectable } from '@angular/core';
 import {
   HttpClient,
 } from '@angular/common/http';
@@ -117,11 +117,11 @@ export class DoorVisionService {
   ): Observable<DoorVisionResult> {
 
     if (
-      files.length < 2 ||
+      files.length < 1 ||
       files.length > 5
     ) {
       throw new Error(
-        'Please provide between 2 and 5 images.',
+        'Please provide between 1 and 5 images.',
       );
     }
 

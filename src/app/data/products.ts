@@ -1,4 +1,4 @@
-﻿export interface Product {
+export interface Product {
   id: string;
   name: string;
   brand: 'SALTO';
@@ -46,8 +46,7 @@ export const ALL_PRODUCTS: Product[] = [
       'What is the door thickness?',
     ],
     specLabel: 'D-Lok Euro Specs',
-    imageUrl:
-      'https://images.unsplash.com/photo-1634224143538-ce0221abf732?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&w=400&h=300',
+    imageUrl: '/locks/salto_dlok_euro.png',
     bomAccessories: [
       'D-Lok Escutcheon',
       'Handle Set',
@@ -83,8 +82,7 @@ export const ALL_PRODUCTS: Product[] = [
       'What is the exact door thickness?',
     ],
     specLabel: 'XS4 Original+ Euro Specs',
-    imageUrl:
-      'https://images.unsplash.com/photo-1677919327739-de8da923a5d9?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&w=400&h=300',
+    imageUrl: '/locks/salto_xs4_original_plus_euro.png',
     bomAccessories: [
       'Lock Escutcheon (pair)',
       'Handle Set',
@@ -121,8 +119,7 @@ export const ALL_PRODUCTS: Product[] = [
       'What is the exact door thickness?',
     ],
     specLabel: 'DBolt Touch Specs',
-    imageUrl:
-      'https://images.unsplash.com/photo-1735201114376-571b44cad9dc?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&w=400&h=300',
+    imageUrl: '/locks/salto_dbolt_touch.png',
     bomAccessories: [
       'DBolt Touch Body',
       'Interior Escutcheon',
@@ -158,8 +155,7 @@ export const ALL_PRODUCTS: Product[] = [
       'What is the exact door thickness?',
     ],
     specLabel: 'DBolt Touch IC Specs',
-    imageUrl:
-      'https://images.unsplash.com/photo-1602503874881-c97c18856ae6?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&w=400&h=300',
+    imageUrl: '/locks/salto_dbolt_touch_ic.png',
     bomAccessories: [
       'DBolt Touch IC Body',
       'Interior Escutcheon',
@@ -195,8 +191,7 @@ export const ALL_PRODUCTS: Product[] = [
       'What is the exact door thickness?',
     ],
     specLabel: 'XS4 Original+ ANSI Specs',
-    imageUrl:
-      'https://images.unsplash.com/photo-1542251224-3e60f8d50cd8?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&w=400&h=300',
+    imageUrl: '/locks/salto_xs4_original_plus_ansi.png',
     bomAccessories: [
       'Lock Escutcheon (pair)',
       'Handle Set',

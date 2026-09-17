@@ -1,7 +1,7 @@
 import os
 import shutil
 import tempfile
-from typing import List
+from typing import List, Optional
 
 from fastapi import (
     FastAPI,
@@ -61,6 +61,8 @@ app = FastAPI(
 )
 
 
+from fastapi.staticfiles import StaticFiles
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -68,6 +70,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+locks_static_dir = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "..",
+    "public",
+    "locks",
+)
+if os.path.isdir(locks_static_dir):
+    app.mount("/locks", StaticFiles(directory=locks_static_dir), name="locks")
 
 
 # =========================================================
@@ -128,17 +139,41 @@ async def health():
 # =========================================================
 # Analyze door from images
 # =========================================================
+# Analyze door info (GET) and analysis (POST)
+# =========================================================
+
+@app.get("/api/analyze-door")
+async def analyze_door_info():
+    return {
+        "status": "online",
+        "service": "DoorVision POC",
+        "endpoint": "/api/analyze-door",
+        "method": "POST",
+        "content_type": "multipart/form-data",
+        "field_name": "files",
+        "accepted_images": "1 to 5 image files (JPEG/PNG)",
+        "message": "The analyze-door service is running and ready. Upload images using HTTP POST multipart/form-data.",
+        "interactive_docs": "http://127.0.0.1:8000/docs#/default/analyze_door_batch_api_analyze_door_post",
+    }
+
 
 @app.post("/api/analyze-door")
 async def analyze_door_batch(
-    files: List[UploadFile] = File(...),
+    files: Optional[List[UploadFile]] = File(None),
+    file: Optional[UploadFile] = File(None),
 ):
-    if not (2 <= len(files) <= 5):
+    all_files: List[UploadFile] = []
+    if files:
+        all_files.extend(files)
+    if file:
+        all_files.append(file)
+
+    if not (1 <= len(all_files) <= 5):
         raise HTTPException(
             status_code=400,
             detail=(
-                f"Provide 2-5 images. "
-                f"Received {len(files)}."
+                f"Please provide 1-5 images under the 'files' field. "
+                f"Received {len(all_files)}."
             ),
         )
 
@@ -149,10 +184,23 @@ async def analyze_door_batch(
         # Save uploaded images temporarily
         # ---------------------------------------------
 
-        for file in files:
+        for file_item in all_files:
+            file_item.file.seek(0, 2)
+            file_size = file_item.file.tell()
+            file_item.file.seek(0)
+
+            if file_size == 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Uploaded file '{file_item.filename or 'image'}' is empty (0 bytes). "
+                        f"Please attach a valid image."
+                    ),
+                )
+
             suffix = (
                 os.path.splitext(
-                    file.filename or ""
+                    file_item.filename or ""
                 )[1]
                 or ".jpg"
             )
@@ -165,7 +213,7 @@ async def analyze_door_batch(
             )
 
             shutil.copyfileobj(
-                file.file,
+                file_item.file,
                 temp_file,
             )
 
@@ -221,6 +269,15 @@ async def analyze_door_batch(
                 ),
             },
         }
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Door analysis failed: {str(error)}",
+        )
 
     finally:
         for path in temp_paths:

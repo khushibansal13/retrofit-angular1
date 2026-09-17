@@ -1,4 +1,4 @@
-﻿<div class="wizard-page">
+<div class="wizard-page">
   <input
     #fileInput
     type="file"
@@ -84,7 +84,7 @@
             <button type="button" class="choice-card scan-choice" (click)="openScan()">
               <span class="choice-icon blue"><mat-icon>document_scanner</mat-icon></span>
               <span class="choice-title">Scan Door Photo</span>
-              <span class="choice-copy">Upload 2–5 door photos — AI detects material, door profile, lock type, and frame details.</span>
+              <span class="choice-copy">Upload 1–5 door photos — AI detects material, door profile, lock type, and frame details.</span>
               <span class="tag-row"><span>Auto-detects material</span><span>Analyses door profile</span><span>Faster setup</span></span>
               <span class="choice-action primary-outline"><mat-icon>camera_alt</mat-icon> Scan my door</span>
             </button>
@@ -105,14 +105,14 @@
           <p class="intro">Take a photo or upload an existing image. AI will extract door parameters automatically.</p>
           <div class="scan-info"><mat-icon>auto_fix_high</mat-icon><div>Using <strong>visual profiling</strong> to detect material, door profile, lock type, and frame details.</div></div>
           <div class="scan-panel">
-            <div class="scan-illustration"><mat-icon>door_front</mat-icon><span>{{ selectedFiles.length ? selectedFiles.length + ' photos selected' : '2–5 door photos required' }}</span></div>
+            <div class="scan-illustration"><mat-icon>door_front</mat-icon><span>{{ selectedFiles.length ? selectedFiles.length + ' photos selected' : '1–5 door photos required' }}</span></div>
             <button type="button" class="primary-button" (click)="openFilePicker()"><mat-icon>cloud_upload</mat-icon> Upload door photos</button>
             <button type="button" class="secondary-button" (click)="openFilePicker()"><mat-icon>photo_camera</mat-icon> Use camera</button>
           </div>
           @if (selectedFiles.length) {
             <div class="small-note">{{ selectedFiles.length }} image{{ selectedFiles.length !== 1 ? 's' : '' }} ready for analysis.</div>
           } @else {
-            <div class="small-note">Select between 2 and 5 clear photos showing the door, frame, and existing lock.</div>
+            <div class="small-note">Select between 1 and 5 clear photos showing the door, frame, and existing lock.</div>
           }
           @if (scanError) {
             <div class="scan-error"><mat-icon>error</mat-icon><span>{{ scanError }}</span></div>
@@ -121,7 +121,7 @@
           <button
             type="button"
             class="primary-button full"
-            [disabled]="selectedFiles.length < 2 || selectedFiles.length > 5"
+            [disabled]="selectedFiles.length < 1 || selectedFiles.length > 5"
             (click)="startScan()">
             Continue to privacy check
             <mat-icon>arrow_forward</mat-icon>
@@ -134,12 +134,12 @@
           <h1>Before we scan your door</h1>
           <p class="intro">Your photo is used only to extract technical door information for this configuration.</p>
           <div class="privacy-card"><mat-icon>shield</mat-icon><div><strong>Privacy & GDPR</strong><p>Do not upload images containing personal data or identifiable people.</p></div></div>
-          <div class="scan-file-summary"><mat-icon>photo_library</mat-icon><span><strong>{{ selectedFiles.length }} photos selected</strong><small>Analysis accepts 2–5 images.</small></span></div>
+          <div class="scan-file-summary"><mat-icon>photo_library</mat-icon><span><strong>{{ selectedFiles.length }} photos selected</strong><small>Analysis accepts 1–5 images.</small></span></div>
           @if (scanError) {
             <div class="scan-error"><mat-icon>error</mat-icon><span>{{ scanError }}</span></div>
           }
           <label class="check-row"><input type="checkbox" [(ngModel)]="gdprChecked"><span>I confirm these photos contain no personal data or identifiable images of individuals.</span></label>
-          <button type="button" class="primary-button full" [disabled]="!gdprChecked || selectedFiles.length < 2 || selectedFiles.length > 5" (click)="beginAnalysis()">Analyse my door <mat-icon>auto_awesome</mat-icon></button>
+          <button type="button" class="primary-button full" [disabled]="!gdprChecked || selectedFiles.length < 1 || selectedFiles.length > 5" (click)="beginAnalysis()">Analyse my door <mat-icon>auto_awesome</mat-icon></button>
         }
 
         @if (detailsMode === 'analyzing') {

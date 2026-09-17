@@ -48,6 +48,12 @@ __screenshots__/
 .env.*.local
 *.tsbuildinfo
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+/scratch
+
 # System files
 .DS_Store
 Thumbs.db

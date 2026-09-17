@@ -11,7 +11,7 @@ engine = SaltoCompatibilityEngine()
 
 # --- STEP 1: UPLOAD & ANALYSIS ---
 uploaded_files = st.file_uploader(
-    "Upload 2 to 3 photos of the door (Wide view, Lock close-up, Door edge)", 
+    "Upload 1 to 5 photos of the door (Wide view, Lock close-up, Door edge)", 
     type=["jpg", "jpeg", "png"], 
     accept_multiple_files=True
 )

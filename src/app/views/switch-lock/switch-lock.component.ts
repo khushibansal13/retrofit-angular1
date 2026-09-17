@@ -1,11 +1,12 @@
-﻿import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 
 import { DoorConfig } from '../../app';
 import { ALL_PRODUCTS, FINISH_COLORS, Product } from '../../data/products';
+import { ArSessionService } from '../../services/ar-session.service';
 
 @Component({
   selector: 'app-switch-lock',
@@ -20,6 +21,7 @@ import { ALL_PRODUCTS, FINISH_COLORS, Product } from '../../data/products';
   styleUrls: ['./switch-lock.component.css'],
 })
 export class SwitchLockComponent {
+  private readonly arSession = inject(ArSessionService);
   @Input({ required: true }) config!: DoorConfig;
 
   @Output() configChange = new EventEmitter<DoorConfig>();
@@ -60,6 +62,8 @@ export class SwitchLockComponent {
       ? this.config.finish
       : product.finishes[0];
 
+    this.arSession.setSelectedProduct(product.id, finish);
+
     this.configChange.emit({
       ...this.config,
       product: product.id,
@@ -69,6 +73,8 @@ export class SwitchLockComponent {
 
   selectFinish(product: Product, finish: string, event: Event): void {
     event.stopPropagation();
+
+    this.arSession.setSelectedProduct(product.id, finish);
 
     this.configChange.emit({
       ...this.config,

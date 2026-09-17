@@ -1,4 +1,4 @@
-﻿import { CommonModule } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import {
   Component,
   ElementRef,
@@ -365,11 +365,11 @@ export class WizardComponent
     }
 
     if (
-      imageFiles.length < 2 ||
+      imageFiles.length < 1 ||
       imageFiles.length > 5
     ) {
       this.scanError =
-        'Please select between 2 and 5 door images.';
+        'Please select between 1 and 5 door images.';
 
       input.value = '';
       return;
@@ -377,6 +377,10 @@ export class WizardComponent
 
     this.selectedFiles =
       imageFiles;
+
+    if (this.selectedFiles.length > 0) {
+      this.arSession.setDoorImage(this.selectedFiles[0]);
+    }
   }
 
   startScan(): void {
@@ -387,15 +391,15 @@ export class WizardComponent
   beginAnalysis(): void {
     if (
       !this.gdprChecked ||
-      this.selectedFiles.length < 2 ||
+      this.selectedFiles.length < 1 ||
       this.selectedFiles.length > 5
     ) {
       if (
-        this.selectedFiles.length < 2 ||
+        this.selectedFiles.length < 1 ||
         this.selectedFiles.length > 5
       ) {
         this.scanError =
-          'Please select between 2 and 5 door images before continuing.';
+          'Please select between 1 and 5 door images before continuing.';
       }
 
       return;
@@ -575,7 +579,7 @@ export class WizardComponent
       return response.detail;
     }
 
-    return 'We could not analyse these images. Please try again with 2–5 clear door photos.';
+    return 'We could not analyse these images. Please try again with 1–5 clear door photos.';
   }
 
   private mapMaterial(
@@ -785,20 +789,21 @@ export class WizardComponent
   selectProduct(
     product: Product,
   ): void {
+    const finish =
+      product.finishes[0] ||
+      'Satin Chrome';
+
     this.setMany({
       product: product.id,
-
-      finish:
-        product.finishes[0] ||
-        'Satin Chrome',
+      finish,
     });
 
     /*
      * Save selected product for AR.
      */
-    sessionStorage.setItem(
-      'retrofit-selected-product',
+    this.arSession.setSelectedProduct(
       product.id,
+      finish,
     );
   }
 
@@ -827,6 +832,11 @@ export class WizardComponent
       product: product.id,
       finish,
     });
+
+    this.arSession.setSelectedProduct(
+      product.id,
+      finish,
+    );
   }
 
   continueFromLock(): void {
@@ -866,6 +876,17 @@ export class WizardComponent
       this.quantity < 1
     ) {
       return;
+    }
+
+    if (this.selectedFiles.length > 0) {
+      this.arSession.setDoorImage(this.selectedFiles[0]);
+    }
+
+    if (this.selectedProduct) {
+      this.arSession.setSelectedProduct(
+        this.selectedProduct.id,
+        this.config.finish || this.selectedProduct.finishes[0],
+      );
     }
 
     this.set(

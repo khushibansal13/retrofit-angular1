@@ -1,7 +1,7 @@
-﻿<div class="hub">
+<div class="hub">
   <div class="hub-content">
     @if (tab === 0) {
-      <app-ar-viewer></app-ar-viewer>
+      <app-ar-viewer [config]="config"></app-ar-viewer>
     }
 
     @if (tab === 1) {
