@@ -11,16 +11,6 @@ class DoorStandard(str, Enum):
     US_INTERCONNECTED = "US_interconnected"               # Interconnected
     ANSI = "ANSI"                                          # Commercial ANSI Mortise
     TRADITIONAL_LEVER = "traditional_lever"                # Skeleton/lever keyway
-
-    # New: three real cases from customer test photos that had nowhere to
-    # go before — forcing them into one of the categories above would have
-    # produced a confidently wrong answer, so they get their own honest
-    # "we don't have a matching product / need more info" treatment in
-    # engine.py instead.
-    GLASS_PATCH_LOCK = "glass_patch_lock"                  # Frameless glass door, patch fittings/patch lock
-    EXISTING_ELECTRONIC_LOCK = "existing_electronic_lock"  # Door or adjacent wall already has a keypad/reader/smart lock
-    NO_HARDWARE_PREPARED = "no_hardware_prepared"          # Bare door slab, no lock cut or installed at all
-
     UNKNOWN = "unknown"
 
 class Handing(str, Enum):
@@ -50,25 +40,13 @@ class LockType(str, Enum):
     MORTISE = "mortise"
     TUBULAR_LATCH = "tubular_latch"
     MORTISE_KEYHOLE = "mortise_keyhole"
-
-    # Matches the three new DoorStandard cases above.
-    PATCH_LOCK = "patch_lock"
-    ELECTRONIC_EXISTING = "electronic_existing"
-    NONE_PREPARED = "none_prepared"
-
     UNKNOWN = "unknown"
 
-class HandlePosition(str, Enum):
-    TOP = "top"          # Near the top of the lock case — Scandinavian-style prep
-    CENTER = "center"     # Roughly centered — most common ANSI/DIN prep
-    BOTTOM = "bottom"     # Below the cylinder/deadbolt
-    UNKNOWN = "unknown"
-
-class HandleType(str, Enum):
-    LEVER = "lever"
-    KNOB = "knob"
-    PULL_BAR = "pull_bar"
-    UNKNOWN = "unknown"
+class DoorMaterial(str, Enum):
+    WOOD = "Wood"
+    GLASS = "Glass"
+    METAL = "Metal"
+    UNKNOWN = "Unknown"
 
 class ComponentObs(BaseModel):
     detected: bool
@@ -78,22 +56,10 @@ class ComponentObs(BaseModel):
 class LockObs(ComponentObs):
     lock_type: LockType
     cylinder_visible: bool
-
-    # NOTE: this is broader than "is there a US-style deadbolt cylinder".
-    # Set it true for ANY additional throw-bolt hardware beyond the main
-    # handle/latch — a separate round/square deadbolt, a manual sliding or
-    # barrel bolt (aldrop) mounted on the surface, or a separate keyhole-only
-    # plate with no handle. It's independent of lock_type: a door can have
-    # deadbolt_present=true even when its primary lock_type is a cylindrical
-    # knob, if it also has one of these added on. See analyzer.py's prompt.
     deadbolt_present: bool
 
-class HandleObs(ComponentObs):
-    handle_position: HandlePosition
-    handle_type: HandleType
-
 class DoorProfile(BaseModel):
-    door_material: str
+    door_material: DoorMaterial
     material_confidence: float = Field(..., ge=0.0, le=1.0)
     door_style: str
     door_standard: DoorStandard
@@ -104,7 +70,7 @@ class DoorProfile(BaseModel):
     stile_width_class: StileWidthClass
     lock: LockObs
     frame: ComponentObs
-    handle: HandleObs
+    handle: ComponentObs
 
     measured_thickness_mm: Optional[float] = None
     measured_backset_mm: Optional[float] = None

@@ -19,12 +19,10 @@ from engine import SaltoCompatibilityEngine
 
 from schema import (
     ComponentObs,
+    DoorMaterial,
     DoorProfile,
     DoorStandard,
     Handing,
-    HandleObs,
-    HandlePosition,
-    HandleType,
     LockObs,
     LockType,
     StileWidthClass,
@@ -125,13 +123,6 @@ class CompatibilityRequest(BaseModel):
     backset_mm: float | None = None
 
     center_to_center_mm: float | None = None
-
-    # Lets the customer correct/confirm the AI-guessed lock type on the
-    # "here's what we found" screen. When set, it overrides profile.lock /
-    # profile.door_standard using the same keyword mapping as the manual
-    # flow, so the picker actually changes the scanned-flow recommendation
-    # instead of only cosmetically updating the UI.
-    existing_lock: str | None = None
 
 
 class ManualDoorRecommendationRequest(BaseModel):
@@ -321,23 +312,6 @@ async def check_compatibility(
         if request.center_to_center_mm is not None:
             profile_data["measured_center_to_center_mm"] = request.center_to_center_mm
 
-        if request.existing_lock:
-            lock_type = map_manual_lock_type(request.existing_lock)
-
-            profile_data["door_standard"] = map_manual_door_standard(request.existing_lock)
-            profile_data["door_standard_confidence"] = 1.0
-
-            profile_data["lock"]["lock_type"] = lock_type
-            profile_data["lock"]["detected"] = True
-            profile_data["lock"]["confidence"] = 1.0
-            profile_data["lock"]["visual_evidence"] = f"Customer-confirmed: {request.existing_lock}"
-            profile_data["lock"]["cylinder_visible"] = lock_type in [LockType.EURO_CYLINDER, LockType.RIM_CYLINDER]
-            profile_data["lock"]["deadbolt_present"] = lock_type in [
-                LockType.MECHANICAL_DEADBOLT,
-                LockType.INTERCONNECTED_DEADBOLT,
-                LockType.RIM_CYLINDER,
-            ]
-
         profile = (
             DoorProfile.model_validate(
                 profile_data
@@ -463,7 +437,7 @@ def build_manual_door_profile(
     thickness_class = map_thickness_class(request.door_thickness_mm)
 
     return DoorProfile(
-        door_material=request.door_material,
+        door_material=map_manual_door_material(request.door_material),
         material_confidence=1.0,
         door_style=request.door_type,
         door_standard=door_standard,
@@ -489,12 +463,10 @@ def build_manual_door_profile(
             confidence=1.0,
             visual_evidence=f"Manual selection: {request.frame_type}",
         ),
-        handle=HandleObs(
+        handle=ComponentObs(
             detected=False,
             confidence=1.0,
             visual_evidence="Handle details were not provided in manual flow.",
-            handle_position=HandlePosition.UNKNOWN,
-            handle_type=HandleType.UNKNOWN,
         ),
         measured_thickness_mm=request.door_thickness_mm,
         measured_backset_mm=request.backset_mm,
@@ -580,6 +552,25 @@ def map_manual_door_standard(existing_lock: str) -> DoorStandard:
         return DoorStandard.EURO_PROFILE
 
     return DoorStandard.UNKNOWN
+
+
+# =========================================================
+# Manual door material mapping
+# =========================================================
+
+def map_manual_door_material(value: str) -> DoorMaterial:
+    normalized = value.strip().lower()
+
+    if "wood" in normalized or "timber" in normalized or "laminate" in normalized:
+        return DoorMaterial.WOOD
+
+    if "glass" in normalized:
+        return DoorMaterial.GLASS
+
+    if "metal" in normalized or "steel" in normalized or "aluminium" in normalized or "aluminum" in normalized:
+        return DoorMaterial.METAL
+
+    return DoorMaterial.UNKNOWN
 
 
 # =========================================================

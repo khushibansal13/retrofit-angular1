@@ -4,69 +4,96 @@ from PIL import Image
 from ollama import chat
 from schema import DoorProfile
 
-# Keep the model configurable, but default to 7b now that you've confirmed
-# it's genuinely better.
-MODEL_NAME = os.environ.get("ANALYZER_MODEL", "qwen2.5vl:7b")
+# 7b as the default now. Override with ANALYZER_MODEL=qwen2.5vl:3b if you
+# ever need to fall back for speed on a specific run.
+MODEL_NAME = os.environ.get("ANALYZER_MODEL", "qwen2.5vl:3b")
 
-# Category wording below is copied verbatim from the customer-facing lock
-# picker (wizard.component.ts's lockTypeOptions) so the AI's classification
-# and the confirmation screen the customer sees say exactly the same thing.
 SALTO_VISION_PROMPT = """You are a senior access control surveyor for Salto Systems.
-Inspect the multi-angle photos of the door to derive technical retrofit parameters.
+Inspect the multi-angle photos of the door and classify it into EXACTLY ONE of the
+6 hardware categories below. Each category is an ATOMIC bundle: door_standard,
+lock_type, cylinder_visible and deadbolt_present must ALL come from the SAME
+category. Never mix a door_standard from one category with a lock_type from
+another — that combination is always wrong.
 
-Classify the current lock into ONE of these six categories — use this exact
-language, it matches what the customer will be shown to confirm or correct:
+1. Euro cylinder:
+   A distinct cylindrical metal body — with a visible keyway slot or a
+   thumb-turn — physically protruding a few millimeters OUT of the door
+   edge/faceplate. The cylinder is its own separate round part, clearly
+   raised above the surrounding metal.
+     -> door_standard: "euro_profile"
+     -> lock_type: "euro_profile_cylinder"
+     -> cylinder_visible: true
 
-1. Euro cylinder: A key cylinder sticks out slightly from a round hole in the door edge.
-   -> door_standard: "euro_profile"
-   -> lock_type: "euro_profile_cylinder"
-   -> cylinder_visible: true
+   DO NOT choose this just because the faceplate has a round hole. Mortise
+   lock faceplates often have round holes for screws, spindles, or unused
+   prep bores that have NO cylinder in them. If you see a hole but nothing
+   is actually protruding out of it, this is NOT category 1 — check
+   category 4 instead.
 
-2. Deadbolt: A single throw-bolt lock, usually above the handle — common on US front doors.
-   -> door_standard: "US_deadbolt"
-   -> lock_type: "mechanical_deadbolt"
-   -> deadbolt_present: true
+2. Deadbolt only:
+   A separate round or square keyed cylinder mounted on its own, 4-6 inches
+   above or below a handle, with NO handle mechanism built into the same
+   plate. Often has a visible throw-bolt.
+     -> door_standard: "US_deadbolt"
+     -> lock_type: "mechanical_deadbolt"
+     -> deadbolt_present: true
 
-3. Deadbolt + handle combo: A deadbolt and the handle/lever are linked together as one connected unit.
-   -> door_standard: "US_interconnected"
-   -> lock_type: "interconnected_deadbolt"
-   -> deadbolt_present: true
+3. Deadbolt + handle combo (interconnected):
+   A deadbolt cylinder and a handle/knob mounted close together and clearly
+   operated as one linked unit (single connecting plate or rod visible
+   between them).
+     -> door_standard: "US_interconnected"
+     -> lock_type: "interconnected_deadbolt"
+     -> deadbolt_present: true
 
-4. Knob or lever: A round knob or lever handle with a keyhole underneath — no separate cylinder ring.
-   -> door_standard: "cylindrical_knob_or_lever"
-   -> lock_type: "cylindrical_knob"
+4. Knob or lever:
+   A round knob or a lever handle with the keyhole built directly into its
+   own center/base, no separate deadbolt cylinder anywhere else on the door.
+   This also covers mortise lock bodies operated by a lever handle on each
+   face of the door, where the faceplate has no protruding cylinder.
+     -> door_standard: "cylindrical_knob_or_lever"
+     -> lock_type: "cylindrical_knob"
 
-5. Surface-mounted box: A rectangular metal box mounted on the surface of the door (night latch style).
-   -> door_standard: "surface_rim_lock"
-   -> lock_type: "rim_cylinder"
-   -> cylinder_visible: true
-   -> deadbolt_present: true
+5. Surface-mounted box:
+   A rectangular metal box mounted ON TOP of the door's surface (not
+   recessed into the door edge), operated by a thumb-turn or key, often with
+   a rim cylinder on the outside face.
+     -> door_standard: "surface_rim_lock"
+     -> lock_type: "rim_cylinder"
+     -> cylinder_visible: true
+     -> deadbolt_present: true
 
-6. Just a latch, no lock: The door only has a spring latch — no separate locking cylinder or bolt.
-   -> door_standard: "passage_latch_euro"
-   -> lock_type: "no_lock_passage"
+6. Just a latch, no lock:
+   Only a handle or lever is present. No keyhole, no cylinder, no deadbolt
+   anywhere on the door — it only latches, it cannot be locked.
+     -> door_standard: "passage_latch_euro"
+     -> lock_type: "no_lock_passage"
 
-If none of these six genuinely match what you see, do not force one — use
-door_standard "unknown" instead of guessing.
+DEADBOLT_PRESENT — READ CAREFULLY:
+Set deadbolt_present: true whenever ANY of the following are visible, even if
+they don't fit neatly into categories 2/3/5 above:
+- A manual slide bolt or barrel bolt (a separate sliding metal bar latch).
+- A separate keyhole-only plate mounted apart from the main handle, even if
+  you cannot see a bolt directly.
+- Any second locking point on the door in addition to the main handle/lock.
+Do NOT set deadbolt_present just because a lock LOOKS secure — only set it
+when you can see a distinct bolt mechanism or a separate keyed cylinder.
 
-DEADBOLT_PRESENT — READ CAREFULLY (this is commonly missed):
-deadbolt_present is NOT limited to category 2/3/5 above. Set it to true
-whenever you see ANY additional throw-bolt security hardware beyond the
-door's main handle/latch, including:
-  - a separate round or square deadbolt cylinder,
-  - a manual sliding bolt or barrel bolt (aldrop) mounted on the surface of
-    the door, operated by hand rather than a key,
-  - a separate keyhole-only plate mounted above or near the main lock, with
-    no handle attached to it.
-This is independent of the category above — for example, a door classified
-as category 4 (Knob or lever) that ALSO has a separate hand-operated slide
-bolt should still have deadbolt_present: true. Look at the full height of
-the door edge, not just the handle area, before deciding this is false.
+DOOR MATERIAL — classify door_material using ONLY these 4 exact values:
+- "Wood": timber, laminate, veneer, painted wood grain, wooden panel doors.
+- "Glass": doors that are predominantly a glass pane or frameless glass,
+  including glass doors with a small patch-fitting lock.
+- "Metal": steel, aluminium, industrial/security doors, fire-rated metal
+  doors, doors with visible metal cladding or a metal frame that makes up
+  most of the visible door surface.
+- "Unknown": use this if you cannot clearly tell — NEVER invent a word like
+  "solid", "composite", or "unclear". Only ever output one of the 4 values
+  above, nothing else.
 
-BRAND TEXT: if a brand name is clearly embossed or printed on the lock
-hardware and legible (e.g. stamped into a knob or faceplate), include it as
-plain text in visual_evidence (e.g. "Knob or lever, 'EUROPA' embossed on
-faceplate"). Do not guess a brand if it isn't clearly legible.
+BRAND TEXT:
+If any brand name or logo is legibly embossed or printed on the lock, handle,
+or cylinder, transcribe it exactly as written into visual_evidence. Never
+guess a brand name you cannot actually read.
 """
 
 
@@ -77,7 +104,7 @@ def optimize_image(img_path: str, max_dimension: int = 1024) -> str:
 
     with Image.open(img_path) as img:
         print(
-            f"[VISION] Original image: size={img.size}, format={img.format}",
+            f"[VISION] Original image size: {img.size[0]}x{img.size[1]}",
             flush=True
         )
 
@@ -88,24 +115,27 @@ def optimize_image(img_path: str, max_dimension: int = 1024) -> str:
         )
 
         print(
-            f"[VISION] Optimized image size: {img.size}",
+            f"[VISION] Optimized image size: {img.size[0]}x{img.size[1]}",
             flush=True
         )
 
         img.save(out_path, "JPEG", quality=85)
 
-    print(f"[VISION] Optimized image created: {out_path}", flush=True)
+    print(f"[VISION] Optimized image saved: {out_path}", flush=True)
 
     return out_path
 
 
 def analyze_door_for_salto(image_paths: List[str]) -> DoorProfile:
-    print("\n" + "=" * 80, flush=True)
+    print("\n" + "=" * 70, flush=True)
     print("[VISION] STARTING SALTO DOOR ANALYSIS", flush=True)
+    print("=" * 70, flush=True)
+
     print(f"[VISION] Model: {MODEL_NAME}", flush=True)
-    print(f"[VISION] Number of input images: {len(image_paths)}", flush=True)
-    print(f"[VISION] Input images: {image_paths}", flush=True)
-    print("=" * 80, flush=True)
+    print(f"[VISION] Input image count: {len(image_paths)}", flush=True)
+
+    for i, path in enumerate(image_paths, start=1):
+        print(f"[VISION] Input image {i}: {path}", flush=True)
 
     optimized_paths = []
 
@@ -113,44 +143,35 @@ def analyze_door_for_salto(image_paths: List[str]) -> DoorProfile:
         # ---------------------------------------------------------
         # Optimize images
         # ---------------------------------------------------------
-        for image_path in image_paths:
+        print("\n[VISION] STEP 1: Optimizing images...", flush=True)
+
+        for path in image_paths:
+            optimized_paths.append(optimize_image(path))
+
+        print(
+            f"[VISION] Optimized {len(optimized_paths)} image(s)",
+            flush=True
+        )
+
+        for i, path in enumerate(optimized_paths, start=1):
             print(
-                f"[VISION] Checking image: {image_path}",
+                f"[VISION] Optimized image {i}: {path}",
                 flush=True
             )
 
-            if not os.path.exists(image_path):
-                print(
-                    f"[VISION][ERROR] Image does not exist: {image_path}",
-                    flush=True
-                )
-                raise FileNotFoundError(image_path)
-
-            optimized_path = optimize_image(image_path)
-            optimized_paths.append(optimized_path)
-
-        print(
-            f"[VISION] Prepared {len(optimized_paths)} images for Ollama",
-            flush=True
-        )
-
-        print(
-            f"[VISION] Images being sent: {optimized_paths}",
-            flush=True
-        )
-
         # ---------------------------------------------------------
-        # Send request to Ollama
+        # Call Ollama
         # ---------------------------------------------------------
-        print("\n[VISION] Calling Ollama...", flush=True)
+        print("\n[VISION] STEP 2: Calling Ollama...", flush=True)
         print(f"[VISION] Model: {MODEL_NAME}", flush=True)
-        print("[VISION] Temperature: 0.0", flush=True)
-        print("[VISION] Context: 16384", flush=True)
         print(
-            "[VISION] Asking model to classify lock and extract "
-            "retrofit parameters...",
+            f"[VISION] Sending {len(optimized_paths)} image(s) to model",
             flush=True
         )
+        print("[VISION] Temperature: 0.0", flush=True)
+        print("[VISION] Context: 8192", flush=True)
+        print("[VISION] Keep alive: 30m", flush=True)
+        print("[VISION] Waiting for model response...", flush=True)
 
         response = chat(
             model=MODEL_NAME,
@@ -171,120 +192,110 @@ def analyze_door_for_salto(image_paths: List[str]) -> DoorProfile:
             format=DoorProfile.model_json_schema(),
             options={
                 "temperature": 0.0,
-                "num_ctx": 16384
-            }
+                "num_ctx": 8192
+            },
+            keep_alive="30m",
         )
 
-        print("\n[VISION] Ollama response received", flush=True)
+        print("\n[VISION] Ollama response received!", flush=True)
 
         # ---------------------------------------------------------
-        # Raw model response
+        # Raw response
         # ---------------------------------------------------------
         raw_response = response.message.content
 
-        print("\n" + "-" * 80, flush=True)
+        print("\n" + "-" * 70, flush=True)
         print("[VISION] RAW MODEL RESPONSE:", flush=True)
+        print("-" * 70, flush=True)
         print(raw_response, flush=True)
-        print("-" * 80, flush=True)
+        print("-" * 70, flush=True)
 
         # ---------------------------------------------------------
         # Validate response
         # ---------------------------------------------------------
-        print(
-            "[VISION] Validating model response against DoorProfile...",
-            flush=True
-        )
+        print("\n[VISION] STEP 3: Validating model response...", flush=True)
 
-        door_profile = DoorProfile.model_validate_json(raw_response)
+        result = DoorProfile.model_validate_json(raw_response)
 
-        print(
-            "[VISION] DoorProfile validation successful",
-            flush=True
-        )
+        print("[VISION] Validation successful!", flush=True)
 
         # ---------------------------------------------------------
         # Print extracted values
         # ---------------------------------------------------------
-        print("\n" + "-" * 80, flush=True)
-        print("[VISION] DETECTED DOOR PARAMETERS:", flush=True)
+        print("\n" + "-" * 70, flush=True)
+        print("[VISION] EXTRACTED DOOR PROFILE", flush=True)
+        print("-" * 70, flush=True)
 
         print(
-            f"[VISION] door_standard = "
-            f"{getattr(door_profile, 'door_standard', None)}",
+            f"[VISION] door_standard      = {result.door_standard}",
             flush=True
         )
 
         print(
-            f"[VISION] lock_type = "
-            f"{getattr(door_profile, 'lock_type', None)}",
+            f"[VISION] lock_type           = {result.lock.lock_type}",
             flush=True
         )
 
         print(
-            f"[VISION] cylinder_visible = "
-            f"{getattr(door_profile, 'cylinder_visible', None)}",
+            f"[VISION] cylinder_visible    = {result.lock.cylinder_visible}",
             flush=True
         )
 
         print(
-            f"[VISION] deadbolt_present = "
-            f"{getattr(door_profile, 'deadbolt_present', None)}",
+            f"[VISION] deadbolt_present    = {result.lock.deadbolt_present}",
             flush=True
         )
 
         print(
-            f"[VISION] visual_evidence = "
-            f"{getattr(door_profile, 'visual_evidence', None)}",
+            f"[VISION] door_material       = {result.door_material}",
             flush=True
         )
-
-        print("-" * 80, flush=True)
 
         print(
-            "[VISION] FINAL DoorProfile:",
+            f"[VISION] visual_evidence     = {result.lock.visual_evidence}",
             flush=True
         )
+
+        print("-" * 70, flush=True)
+
+        print("\n[VISION] FINAL DoorProfile:", flush=True)
         print(
-            door_profile.model_dump_json(indent=2),
+            result.model_dump_json(indent=2),
             flush=True
         )
 
-        print("\n[VISION] SALTO DOOR ANALYSIS COMPLETED", flush=True)
-        print("=" * 80 + "\n", flush=True)
+        print("\n[VISION] SALTO DOOR ANALYSIS COMPLETE", flush=True)
 
-        return door_profile
+        return result
 
     except Exception as e:
-        print("\n" + "=" * 80, flush=True)
-        print("[VISION][ERROR] SALTO DOOR ANALYSIS FAILED", flush=True)
-        print(
-            f"[VISION][ERROR] {type(e).__name__}: {e}",
-            flush=True
-        )
-        print("=" * 80, flush=True)
+        print("\n" + "!" * 70, flush=True)
+        print("[VISION] ERROR DURING SALTO DOOR ANALYSIS", flush=True)
+        print(f"[VISION] Error type: {type(e).__name__}", flush=True)
+        print(f"[VISION] Error: {e}", flush=True)
+        print("!" * 70, flush=True)
+
         raise
 
     finally:
         # ---------------------------------------------------------
-        # Cleanup optimized images
+        # Cleanup
         # ---------------------------------------------------------
-        print(
-            "[VISION] Cleaning up optimized images...",
-            flush=True
-        )
+        print("\n[VISION] STEP 4: Cleaning up optimized images...", flush=True)
 
         for p in optimized_paths:
             if os.path.exists(p):
                 try:
                     os.remove(p)
                     print(
-                        f"[VISION] Removed temporary image: {p}",
+                        f"[VISION] Deleted: {p}",
                         flush=True
                     )
                 except OSError as e:
                     print(
-                        f"[VISION][WARNING] Failed to remove {p}: {e}",
+                        f"[VISION] Could not delete {p}: {e}",
                         flush=True
                     )
 
-        print("[VISION] Cleanup complete", flush=True)
+        print("[VISION] Cleanup complete.", flush=True)
+        print("=" * 70 + "\n", flush=True)
