@@ -249,6 +249,38 @@
 
             </div>
 
+            <!-- Customer's complete configuration — not just the
+                 fit-relevant fields shown in the summary strip above. -->
+            @if (getConfigChips(q).length) {
+              <div class="config-summary">
+                <div class="config-summary-title">
+                  <mat-icon>fact_check</mat-icon>
+                  <span>Customer's Full Configuration</span>
+                </div>
+
+                <div class="config-chip-row">
+                  @for (chip of getConfigChips(q); track chip) {
+                    <span class="config-chip">{{ chip }}</span>
+                  }
+                </div>
+              </div>
+            }
+
+            @if (getAccessMethods(q).length) {
+              <div class="config-summary">
+                <div class="config-summary-title">
+                  <mat-icon>vpn_key</mat-icon>
+                  <span>Preferred Unlock Methods</span>
+                </div>
+
+                <div class="config-chip-row">
+                  @for (method of getAccessMethods(q); track method) {
+                    <span class="config-chip access">{{ method }}</span>
+                  }
+                </div>
+              </div>
+            }
+
             <div class="bom-list">
 
               @for (
@@ -308,6 +340,14 @@
 
             {{ expanded ? 'Hide BOM' : 'View BOM' }}
 
+          </button>
+
+          <button
+            mat-button
+            class="download-button"
+            (click)="downloadQuote(q)">
+            <mat-icon>download</mat-icon>
+            Download
           </button>
 
           <span class="action-spacer"></span>

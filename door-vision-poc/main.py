@@ -22,6 +22,9 @@ from schema import (
     DoorProfile,
     DoorStandard,
     Handing,
+    HandleObs,
+    HandlePosition,
+    HandleType,
     LockObs,
     LockType,
     StileWidthClass,
@@ -122,6 +125,13 @@ class CompatibilityRequest(BaseModel):
     backset_mm: float | None = None
 
     center_to_center_mm: float | None = None
+
+    # Lets the customer correct/confirm the AI-guessed lock type on the
+    # "here's what we found" screen. When set, it overrides profile.lock /
+    # profile.door_standard using the same keyword mapping as the manual
+    # flow, so the picker actually changes the scanned-flow recommendation
+    # instead of only cosmetically updating the UI.
+    existing_lock: str | None = None
 
 
 class ManualDoorRecommendationRequest(BaseModel):
@@ -311,6 +321,23 @@ async def check_compatibility(
         if request.center_to_center_mm is not None:
             profile_data["measured_center_to_center_mm"] = request.center_to_center_mm
 
+        if request.existing_lock:
+            lock_type = map_manual_lock_type(request.existing_lock)
+
+            profile_data["door_standard"] = map_manual_door_standard(request.existing_lock)
+            profile_data["door_standard_confidence"] = 1.0
+
+            profile_data["lock"]["lock_type"] = lock_type
+            profile_data["lock"]["detected"] = True
+            profile_data["lock"]["confidence"] = 1.0
+            profile_data["lock"]["visual_evidence"] = f"Customer-confirmed: {request.existing_lock}"
+            profile_data["lock"]["cylinder_visible"] = lock_type in [LockType.EURO_CYLINDER, LockType.RIM_CYLINDER]
+            profile_data["lock"]["deadbolt_present"] = lock_type in [
+                LockType.MECHANICAL_DEADBOLT,
+                LockType.INTERCONNECTED_DEADBOLT,
+                LockType.RIM_CYLINDER,
+            ]
+
         profile = (
             DoorProfile.model_validate(
                 profile_data
@@ -462,10 +489,12 @@ def build_manual_door_profile(
             confidence=1.0,
             visual_evidence=f"Manual selection: {request.frame_type}",
         ),
-        handle=ComponentObs(
+        handle=HandleObs(
             detected=False,
             confidence=1.0,
             visual_evidence="Handle details were not provided in manual flow.",
+            handle_position=HandlePosition.UNKNOWN,
+            handle_type=HandleType.UNKNOWN,
         ),
         measured_thickness_mm=request.door_thickness_mm,
         measured_backset_mm=request.backset_mm,

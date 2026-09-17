@@ -34,6 +34,7 @@ type Screen =
   | 'environment'
   | 'details'
   | 'lock'
+  | 'specs'
   | 'bom';
 
 type DetailsMode =
@@ -45,15 +46,51 @@ type DetailsMode =
   | 'analyzing';
 
 interface DetectedProfile {
-  material: 'Wood' | 'Glass';
+  material: 'Wood' | 'Glass' | 'Metal';
   materialConf: number;
   doorStyle: string;
   styleConf: number;
   existingLock: string;
   lockConf: number;
   frameConf: number;
+  frameEvidence: string;
+  handleEvidence: string;
   handing: string;
   handingConf: number;
+  stileWidth: string;
+  handlePosition: string;
+  handleType: string;
+  backsetMm: number | null;
+  centerToCenterMm: number | null;
+}
+
+interface LockTypeOption {
+  id: string;
+  icon: string;
+  label: string;
+  desc: string;
+  existingLockValue: string;
+}
+
+interface ChoiceOption {
+  value: string;
+  label: string;
+  hint: string;
+}
+
+interface AccessMethodOption {
+  id: string;
+  icon: string;
+  label: string;
+  desc: string;
+  bomItem: string;
+}
+
+interface CardOption {
+  id: string;
+  icon: string;
+  label: string;
+  desc: string;
 }
 
 @Component({
@@ -96,6 +133,11 @@ export class WizardComponent
 
   detailsMode: DetailsMode = 'choice';
 
+  // Local, transient carousel position for the business-profile screen.
+  // Not persisted in DoorConfig — purely a "which slide is showing" flag.
+  // 0 = business domain, 1 = budget, 2 = usage traffic.
+  bizStep = 0;
+
   scanProgress = 0;
   scanLine = 0;
 
@@ -107,26 +149,85 @@ export class WizardComponent
 
   analysisResult: DoorVisionResult | null = null;
 
-  // Toggles the optional installer-detail inputs (backset, center-to-center).
-  // Off by default so a casual customer sees only material/width/height/thickness.
-  showAdvancedDetails = false;
-
   detectedProfile: DetectedProfile | null = null;
 
   readonly products = ALL_PRODUCTS;
 
-  readonly environments = [
+  readonly businessDomains: CardOption[] = [
     {
-      id: 'Home' as const,
+      id: 'Home / Residential',
       icon: 'home',
       label: 'Home / Residential',
       desc: 'Private home or apartment',
     },
     {
-      id: 'Facility' as const,
+      id: 'Hotel / Hospitality',
+      icon: 'hotel',
+      label: 'Hotel / Hospitality',
+      desc: 'Guest rooms, staff and back-of-house doors',
+    },
+    {
+      id: 'Office / Corporate',
       icon: 'business',
-      label: 'Facility / Commercial',
-      desc: 'Office, retail, or commercial site',
+      label: 'Office / Corporate',
+      desc: 'Workplace and office access',
+    },
+    {
+      id: 'Education / University',
+      icon: 'school',
+      label: 'Education / University',
+      desc: 'Campus, dorms, classrooms',
+    },
+    {
+      id: 'Healthcare',
+      icon: 'local_hospital',
+      label: 'Healthcare',
+      desc: 'Clinics, hospitals, care facilities',
+    },
+    {
+      id: 'Retail',
+      icon: 'storefront',
+      label: 'Retail',
+      desc: 'Shops and retail units',
+    },
+    {
+      id: 'Government / Institutional',
+      icon: 'account_balance',
+      label: 'Government / Institutional',
+      desc: 'Public sector and institutional buildings',
+    },
+    {
+      id: 'Other',
+      icon: 'apartment',
+      label: 'Other',
+      desc: "Something else — we'll ask more if needed",
+    },
+  ];
+
+  readonly budgetOptions: CardOption[] = [
+    {
+      id: 'Under €1,000',
+      icon: 'savings',
+      label: 'Under €1,000',
+      desc: 'Small, single-door budget',
+    },
+    {
+      id: '€1,000 – €5,000',
+      icon: 'balance',
+      label: '€1,000 – €5,000',
+      desc: 'A handful of doors',
+    },
+    {
+      id: '€5,000 – €10,000',
+      icon: 'workspace_premium',
+      label: '€5,000 – €10,000',
+      desc: 'Multi-door rollout',
+    },
+    {
+      id: 'Over €10,000',
+      icon: 'account_balance',
+      label: 'Over €10,000',
+      desc: 'Full-site or enterprise project',
     },
   ];
 
@@ -140,6 +241,11 @@ export class WizardComponent
       id: 'Glass' as const,
       icon: '🪟',
       desc: 'Frameless or semi-framed toughened glass',
+    },
+    {
+      id: 'Metal' as const,
+      icon: '🔩',
+      desc: 'Steel or aluminium security doors',
     },
   ];
 
@@ -155,6 +261,140 @@ export class WizardComponent
     'Double',
   ];
 
+  readonly lockTypeOptions: LockTypeOption[] = [
+    {
+      id: 'euro',
+      icon: 'vpn_key',
+      label: 'Euro cylinder',
+      desc: 'A key cylinder sticks out slightly from a round hole in the door edge.',
+      existingLockValue: 'Euro Cylinder',
+    },
+    {
+      id: 'us_deadbolt',
+      icon: 'lock',
+      label: 'Deadbolt',
+      desc: 'A single throw-bolt lock, usually above the handle — common on US front doors.',
+      existingLockValue: 'US Deadbolt',
+    },
+    {
+      id: 'us_interconnected',
+      icon: 'link',
+      label: 'Deadbolt + handle combo',
+      desc: 'A deadbolt and the handle/lever are linked together as one connected unit.',
+      existingLockValue: 'US Interconnected Deadbolt',
+    },
+    {
+      id: 'cylindrical_knob',
+      icon: 'radio_button_checked',
+      label: 'Knob or lever',
+      desc: 'A round knob or lever handle with a keyhole underneath — no separate cylinder ring.',
+      existingLockValue: 'Cylindrical Knob or Lever',
+    },
+    {
+      id: 'surface_rim',
+      icon: 'inventory_2',
+      label: 'Surface-mounted box',
+      desc: 'A rectangular metal box mounted on the surface of the door (night latch style).',
+      existingLockValue: 'Surface Rim Lock',
+    },
+    {
+      id: 'passage',
+      icon: 'remove_circle_outline',
+      label: 'Just a latch, no lock',
+      desc: 'The door only has a spring latch — no separate locking cylinder or bolt.',
+      existingLockValue: 'Passage Latch',
+    },
+  ];
+
+  readonly backsetOptions: ChoiceOption[] = [
+    { value: '60', label: '60 mm', hint: '≈ 2 3/8″ — most common' },
+    { value: '70', label: '70 mm', hint: '≈ 2 3/4″' },
+  ];
+
+  readonly centerToCenterOptions: ChoiceOption[] = [
+    { value: '101.6', label: '101.6 mm', hint: '≈ 4″ — most common' },
+    { value: '139.7', label: '139.7 mm', hint: '≈ 5 1/2″' },
+  ];
+
+  readonly accessMethodOptions: AccessMethodOption[] = [
+    {
+      id: 'phone',
+      icon: 'smartphone',
+      label: 'Phone (Bluetooth/App)',
+      desc: 'Unlock from a mobile app',
+      bomItem: 'Mobile Credential License',
+    },
+    {
+      id: 'card',
+      icon: 'credit_card',
+      label: 'Key card / fob',
+      desc: 'Tap a card or fob to unlock',
+      bomItem: 'RFID Key Cards (pack of 5)',
+    },
+    {
+      id: 'pin',
+      icon: 'dialpad',
+      label: 'PIN code',
+      desc: 'Enter a code on a keypad',
+      bomItem: 'PIN Keypad Module',
+    },
+    {
+      id: 'key',
+      icon: 'key',
+      label: 'Physical key (backup)',
+      desc: 'Keep a mechanical key as a backup',
+      bomItem: 'Mechanical Override Key (pair)',
+    },
+  ];
+
+  readonly handlePositionOptions: CardOption[] = [
+    {
+      id: 'top',
+      icon: 'vertical_align_top',
+      label: 'Top',
+      desc: 'Handle sits near the top of the lock case — often Scandinavian-style prep.',
+    },
+    {
+      id: 'center',
+      icon: 'vertical_align_center',
+      label: 'Center',
+      desc: 'Handle is roughly centered on the lock case — most common ANSI/DIN prep.',
+    },
+    {
+      id: 'bottom',
+      icon: 'vertical_align_bottom',
+      label: 'Bottom',
+      desc: 'Handle sits below the cylinder/deadbolt.',
+    },
+  ];
+
+  readonly hostingOptions: ChoiceOption[] = [
+    { value: 'on_premise', label: 'On-premise', hint: 'Your own server' },
+    { value: 'cloud', label: 'SALTO Cloud', hint: 'Hosted for you' },
+  ];
+
+  readonly connectivityOptions: ChoiceOption[] = [
+    { value: 'wired', label: 'Wired', hint: 'Hardwired to network' },
+    { value: 'wireless', label: 'Wireless', hint: 'Battery + BLE/RF' },
+  ];
+
+  // Now also shown on the business-profile carousel (step 3), not just the
+  // specs screen — usage patterns are a business-context question, so they
+  // belong alongside domain/budget.
+  readonly usageTrafficOptions: ChoiceOption[] = [
+    { value: 'low', label: 'Low', hint: '< 50 uses/day' },
+    { value: 'medium', label: 'Medium', hint: '50–200 uses/day' },
+    { value: 'high', label: 'High', hint: '200+ uses/day' },
+  ];
+
+  readonly handleTypeOptions: ChoiceOption[] = [
+    { value: 'lever', label: 'Lever', hint: 'Push-down handle' },
+    { value: 'knob', label: 'Knob', hint: 'Round turning knob' },
+    { value: 'pull_bar', label: 'Pull bar', hint: 'Straight pull handle' },
+  ];
+
+  readonly readerColors = Object.keys(FINISH_COLORS);
+
   readonly steps: {
     id: Screen;
     label: string;
@@ -162,8 +402,8 @@ export class WizardComponent
   }[] = [
     {
       id: 'environment',
-      label: 'Installation',
-      shortLabel: 'Install',
+      label: 'Business Profile',
+      shortLabel: 'Profile',
     },
     {
       id: 'details',
@@ -174,6 +414,11 @@ export class WizardComponent
       id: 'lock',
       label: 'Smart Lock',
       shortLabel: 'Lock',
+    },
+    {
+      id: 'specs',
+      label: 'Extra Details',
+      shortLabel: 'Specs',
     },
     {
       id: 'bom',
@@ -188,10 +433,6 @@ export class WizardComponent
   private detectTimer:
     ReturnType<typeof setTimeout> | null = null;
 
-  /*
-   * DoorConfig.product contains only the product ID.
-   * Resolve that ID to the actual catalog Product.
-   */
   get selectedProduct(): Product | undefined {
     if (!this.config.product) {
       return undefined;
@@ -206,6 +447,42 @@ export class WizardComponent
     return this.config.material === 'Glass';
   }
 
+  get isMetal(): boolean {
+    return this.config.material === 'Metal';
+  }
+
+  get showBacksetQuestion(): boolean {
+    return (
+      this.config.existingLockId === 'us_deadbolt' ||
+      this.config.existingLockId === 'us_interconnected'
+    );
+  }
+
+  get showCenterToCenter(): boolean {
+    return this.config.existingLockId === 'us_interconnected';
+  }
+
+  isAiSuppliedValue(value: string, options: ChoiceOption[]): boolean {
+    return !!value && !options.some(option => option.value === value);
+  }
+
+  get isHotel(): boolean {
+    return this.config.environment === 'Hotel / Hospitality';
+  }
+
+  get showHighTrafficAdvisory(): boolean {
+    return (
+      this.config.usageTraffic === 'high' ||
+      this.config.environment === 'Education / University'
+    );
+  }
+
+  get accessMethodBomItems(): string[] {
+    return this.accessMethodOptions
+      .filter(option => this.isAccessMethodSelected(option.id))
+      .map(option => option.bomItem);
+  }
+
   get quantity(): number {
     return Math.max(
       1,
@@ -213,25 +490,12 @@ export class WizardComponent
     );
   }
 
-  /*
-   * Compatibility always comes from the backend recommendation.
-   */
   get fit(): boolean {
     if (!this.selectedProduct) {
       return false;
     }
 
-    const recommendation =
-      this.analysisResult?.recommendations.find(
-        result =>
-          result.product_id ===
-          this.selectedProduct?.id,
-      );
-
-    return (
-      recommendation?.status ===
-      'compatible'
-    );
+    return this.isProductCompatible(this.selectedProduct.id);
   }
 
   get recommendationResults(): DoorVisionRecommendation[] {
@@ -263,6 +527,33 @@ export class WizardComponent
         recommendation.status ===
         'incompatible',
     );
+  }
+
+  get bomExtraSpecChips(): string[] {
+    const c = this.config;
+    const chips: string[] = [];
+
+    if (c.environment) chips.push(`Business: ${c.environment}`);
+    if (c.budget) chips.push(`Budget: ${c.budget}`);
+    if (c.currentMortiseType) chips.push(`Current mortise: ${c.currentMortiseType}`);
+    if (c.backsetMm) chips.push(`Backset ${c.backsetMm}mm`);
+    if (c.centerToCenterMm) chips.push(`Center-to-center ${c.centerToCenterMm}mm`);
+    if (c.handlePosition) chips.push(`Handle position: ${this.formatValue(c.handlePosition)}`);
+    if (c.handleType) chips.push(this.formatValue(c.handleType));
+    if (c.needsDeadbolt) chips.push('Wants thumb-turn deadbolt');
+    if (c.needsKeyholeFailover) chips.push('Wants mechanical key backup');
+    if (c.doubleSidedLock) chips.push('Double-sided locking');
+    if (c.waterResistant) chips.push('Exterior / weather-exposed');
+    if (c.hostingPreference) {
+      chips.push(c.hostingPreference === 'on_premise' ? 'On-premise hosting' : 'SALTO cloud platform');
+    }
+    if (c.connectivity) chips.push(this.formatValue(c.connectivity));
+    if (c.usageTraffic) chips.push(`${this.formatValue(c.usageTraffic)} traffic`);
+    if (c.readerColor) chips.push(`Reader: ${c.readerColor}`);
+    if (c.spindleMm && c.spindleMm !== '8') chips.push(`Spindle ${c.spindleMm}mm`);
+    if (c.cylinderToHandleMm) chips.push(`Cylinder-to-handle ${c.cylinderToHandleMm}mm`);
+
+    return chips;
   }
 
   getProduct(
@@ -300,17 +591,24 @@ export class WizardComponent
     );
   }
 
-  toggleAdvancedDetails(): void {
-    this.showAdvancedDetails = !this.showAdvancedDetails;
+  selectBusinessDomain(id: string): void {
+    this.set('environment', id);
+    this.bizStep = 1;
   }
 
-  selectEnvironment(
-    id: 'Home' | 'Facility',
-  ): void {
-    this.set(
-      'environment',
-      id,
-    );
+  // New: picking a budget now advances to the usage-traffic slide, the same
+  // way picking a domain advances to budget.
+  selectBudget(id: string): void {
+    this.set('budget', id);
+    this.bizStep = 2;
+  }
+
+  goToBizStep(step: number): void {
+    if (step >= 1 && !this.config.environment) {
+      return;
+    }
+
+    this.bizStep = step;
   }
 
   continueFromEnvironment(): void {
@@ -452,6 +750,19 @@ export class WizardComponent
       });
   }
 
+  private isUsefulEvidence(text: string | undefined | null): boolean {
+    if (!text) {
+      return false;
+    }
+
+    const normalized = text.trim().toLowerCase();
+
+    return (
+      normalized.length > 6 &&
+      !['yes', 'no', 'true', 'false', 'unknown', 'n/a'].includes(normalized)
+    );
+  }
+
   private handleAnalysisSuccess(
     result: DoorVisionResult,
   ): void {
@@ -514,6 +825,16 @@ export class WizardComponent
           result.profile.frame.confidence,
         ),
 
+      frameEvidence:
+        this.isUsefulEvidence(result.profile.frame.visual_evidence)
+          ? result.profile.frame.visual_evidence
+          : '',
+
+      handleEvidence:
+        this.isUsefulEvidence((result.profile.handle as any)?.visual_evidence)
+          ? (result.profile.handle as any).visual_evidence
+          : '',
+
       handing:
         this.formatValue(
           result.profile.handing,
@@ -523,14 +844,48 @@ export class WizardComponent
         this.toPercent(
           result.profile.handing_confidence,
         ),
+
+      stileWidth:
+        this.formatValue(
+          result.profile.stile_width_class,
+        ),
+
+      handlePosition:
+        (result.profile.handle as any)?.handle_position &&
+        (result.profile.handle as any).handle_position !== 'unknown'
+          ? this.formatValue((result.profile.handle as any).handle_position)
+          : '',
+
+      handleType:
+        (result.profile.handle as any)?.handle_type &&
+        (result.profile.handle as any).handle_type !== 'unknown'
+          ? this.formatValue((result.profile.handle as any).handle_type)
+          : '',
+
+      backsetMm: result.profile.measured_backset_mm,
+      centerToCenterMm: result.profile.measured_center_to_center_mm,
     };
+
+    const existingLockId =
+      this.mapLockTypeToOptionId(
+        result.profile.lock.lock_type,
+      );
+
+    const matchedOption =
+      this.lockTypeOptions.find(
+        option => option.id === existingLockId,
+      );
 
     const updates:
       Partial<DoorConfig> = {
       material,
 
+      existingLockId,
+
       existingLock:
-      result.profile.lock.lock_type,
+        matchedOption
+          ? matchedOption.existingLockValue
+          : result.profile.lock.lock_type,
 
       type:
         this.config.type ||
@@ -549,6 +904,24 @@ export class WizardComponent
               .measured_thickness_mm,
           ),
         );
+    }
+
+    if (result.profile.measured_backset_mm != null) {
+      updates.backsetMm = String(result.profile.measured_backset_mm);
+    }
+
+    if (result.profile.measured_center_to_center_mm != null) {
+      updates.centerToCenterMm = String(result.profile.measured_center_to_center_mm);
+    }
+
+    const handlePos = (result.profile.handle as any)?.handle_position;
+    if (handlePos && handlePos !== 'unknown') {
+      updates.handlePosition = handlePos;
+    }
+
+    const handleTyp = (result.profile.handle as any)?.handle_type;
+    if (handleTyp && handleTyp !== 'unknown') {
+      updates.handleType = handleTyp;
     }
 
     this.setMany(
@@ -596,13 +969,40 @@ export class WizardComponent
 
   private mapMaterial(
     material: string,
-  ): 'Wood' | 'Glass' {
+  ): 'Wood' | 'Glass' | 'Metal' {
     const value =
       material.toLowerCase();
 
-    return value.includes('glass')
-      ? 'Glass'
-      : 'Wood';
+    if (value.includes('glass')) {
+      return 'Glass';
+    }
+
+    if (
+      value.includes('metal') ||
+      value.includes('steel') ||
+      value.includes('aluminium') ||
+      value.includes('aluminum')
+    ) {
+      return 'Metal';
+    }
+
+    return 'Wood';
+  }
+
+  private mapLockTypeToOptionId(
+    lockType: string,
+  ): string {
+    const map: Record<string, string> = {
+      euro_profile_cylinder: 'euro',
+      cylindrical_knob: 'cylindrical_knob',
+      rim_cylinder: 'surface_rim',
+      no_lock_passage: 'passage',
+      mechanical_deadbolt: 'us_deadbolt',
+      interconnected_deadbolt: 'us_interconnected',
+      tubular_latch: 'cylindrical_knob',
+    };
+
+    return map[lockType] ?? '';
   }
 
   private toPercent(
@@ -641,7 +1041,7 @@ export class WizardComponent
   }
 
   setMaterial(
-    material: 'Wood' | 'Glass',
+    material: 'Wood' | 'Glass' | 'Metal',
   ): void {
     this.setMany({
       material,
@@ -650,12 +1050,58 @@ export class WizardComponent
     });
   }
 
+  selectLockType(
+    option: LockTypeOption,
+  ): void {
+    const updates: Partial<DoorConfig> = {
+      existingLockId: option.id,
+      existingLock: option.existingLockValue,
+    };
+
+    if (option.id !== 'us_deadbolt' && option.id !== 'us_interconnected') {
+      updates.backsetMm = '';
+    }
+
+    if (option.id !== 'us_interconnected') {
+      updates.centerToCenterMm = '';
+    }
+
+    this.setMany(updates);
+  }
+
+  selectBackset(value: string): void {
+    this.set(
+      'backsetMm',
+      this.config.backsetMm === value ? '' : value,
+    );
+  }
+
+  selectCenterToCenter(value: string): void {
+    this.set(
+      'centerToCenterMm',
+      this.config.centerToCenterMm === value ? '' : value,
+    );
+  }
+
+  toggleAccessMethod(id: string): void {
+    const current = this.config.accessMethods ?? [];
+
+    const next = current.includes(id)
+      ? current.filter(item => item !== id)
+      : [...current, id];
+
+    this.setMany({ accessMethods: next });
+  }
+
+  isAccessMethodSelected(id: string): boolean {
+    return (this.config.accessMethods ?? []).includes(id);
+  }
+
   continueFromDetails(): void {
     if (
       !this.config.material ||
-      !this.config.width ||
-      !this.config.height ||
-      !this.config.thickness
+      !this.config.thickness ||
+      (!this.analysisResult && !this.config.existingLockId)
     ) {
       return;
     }
@@ -677,11 +1123,6 @@ export class WizardComponent
       ? Number(this.config.centerToCenterMm)
       : undefined;
 
-    /*
-     * --------------------------------------------------
-     * SCANNED FLOW
-     * --------------------------------------------------
-     */
     if (this.analysisResult) {
       const profile = {
         ...this.analysisResult.profile,
@@ -695,19 +1136,11 @@ export class WizardComponent
           door_thickness_mm: thickness,
           backset_mm: backsetMm,
           center_to_center_mm: centerToCenterMm,
+          existing_lock: this.config.existingLockId ? this.config.existingLock : undefined,
         })
         .subscribe({
           next: result => {
-            this.analysisResult =
-              result;
-
-            this.setMany({
-              thickness:
-                String(thickness),
-            });
-
-            this.screen =
-              'lock';
+            this.applyRecommendationResult(result, thickness);
           },
 
           error: error => {
@@ -721,11 +1154,6 @@ export class WizardComponent
       return;
     }
 
-    /*
-     * --------------------------------------------------
-     * MANUAL FLOW
-     * --------------------------------------------------
-     */
     this.doorVision
       .recommendProducts({
         door_material:
@@ -751,16 +1179,7 @@ export class WizardComponent
       })
       .subscribe({
         next: result => {
-          this.analysisResult =
-            result;
-
-          this.setMany({
-            thickness:
-              String(thickness),
-          });
-
-          this.screen =
-            'lock';
+          this.applyRecommendationResult(result, thickness);
         },
 
         error: error => {
@@ -770,6 +1189,30 @@ export class WizardComponent
             );
         },
       });
+  }
+
+  private applyRecommendationResult(
+    result: DoorVisionResult,
+    thickness: number,
+  ): void {
+    this.analysisResult = result;
+
+    const updates: Partial<DoorConfig> = {
+      thickness: String(thickness),
+    };
+
+    if (
+      this.config.product &&
+      !result.recommendations.some(
+        r => r.product_id === this.config.product && r.status === 'compatible',
+      )
+    ) {
+      updates.product = null;
+    }
+
+    this.setMany(updates);
+
+    this.screen = 'lock';
   }
 
   selectProduct(
@@ -793,6 +1236,10 @@ export class WizardComponent
   selectRecommendation(
     recommendation: DoorVisionRecommendation,
   ): void {
+    if (recommendation.status !== 'compatible') {
+      return;
+    }
+
     const product =
       this.getProduct(
         recommendation.product_id,
@@ -823,10 +1270,14 @@ export class WizardComponent
   }
 
   continueFromLock(): void {
-    if (!this.config.product) {
+    if (!this.config.product || !this.isProductCompatible(this.config.product)) {
       return;
     }
 
+    this.screen = 'specs';
+  }
+
+  continueFromSpecs(): void {
     this.screen = 'bom';
   }
 
@@ -929,8 +1380,6 @@ export class WizardComponent
 
     if (
       this.config.material &&
-      this.config.width &&
-      this.config.height &&
       this.config.thickness
     ) {
       this.screen = 'lock';
@@ -971,10 +1420,11 @@ export class WizardComponent
         return !!(
           this.config.environment &&
           this.config.material &&
-          this.config.width &&
-          this.config.height &&
           this.config.thickness
         );
+
+      case 'specs':
+        return !!this.config.product;
 
       case 'bom':
         return !!this.config.product;

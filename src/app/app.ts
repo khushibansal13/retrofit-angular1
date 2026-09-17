@@ -4,18 +4,45 @@ import { WizardComponent } from './views/wizard/wizard.component';
 import { HubComponent } from './views/hub/hub.component';
 
 export interface DoorConfig {
-  environment: 'Home' | 'Facility' | '';
+  // Holds a business-domain label ("Home / Residential", "Hotel /
+  // Hospitality", ...) — kept as a plain string and kept the field name so
+  // quotes-list.html/bom-quote.html (which just display it) don't need
+  // touching.
+  environment: string;
+
+  // Price band (e.g. "Under €1,000" ... "Over €10,000") — shown in the
+  // BOM/quote only, not read by the compatibility engine.
+  budget: string;
+
   flowType: 'A' | 'B' | '';
   gdprAccepted: boolean;
-  material: 'Wood' | 'Glass' | '';
+  material: 'Wood' | 'Glass' | 'Metal' | '';
   type: string;
   thickness: string;
+
+  // Kept for other views that already display them (support/switch-lock/
+  // bom-quote screens) but no longer asked in the wizard itself — only
+  // thickness is collected now.
   width: string;
   height: string;
+
   direction: string;
   leafCount: string;
   frameType: string;
+
+  // Every customer is now asked about their existing lock, no retrofit-vs-
+  // new-installation branching.
   existingLock: string;
+
+  // UI-only id driving the "what does your lock look like?" picker's
+  // selected-card styling and gating which follow-up questions show.
+  // existingLock (above) carries the actual keyword string sent to the backend.
+  existingLockId: string;
+
+  // Free-text brand/model of the mortise case currently installed —
+  // sales-enrichment field, not read by the engine.
+  currentMortiseType: string;
+
   product: string | null;
   finish: string;
   quantity: string;
@@ -23,10 +50,25 @@ export interface DoorConfig {
   orderStatus: 'draft' | 'submitted' | 'approved' | 'delivered' | 'installed' | '';
 
   // Kept: DoorProfile still supports measured_backset_mm/measured_center_to_center_mm.
-  // Dropped countryCode/faceplate/leverStyle/hingeType — the simplified DoorProfile
-  // has nowhere to put them.
   backsetMm: string;
   centerToCenterMm: string;
+
+  // Preference only — feeds extra BOM line items, never the compatibility check.
+  accessMethods: string[];
+
+  // --- Optional "sales & install" fields (all BOM-only, asked for everyone) ---
+  handlePosition: string;
+  handleType: string;
+  needsDeadbolt: boolean;
+  needsKeyholeFailover: boolean;
+  doubleSidedLock: boolean;
+  waterResistant: boolean;
+  hostingPreference: string;
+  connectivity: string;
+  usageTraffic: string;
+  readerColor: string;
+  spindleMm: string;
+  cylinderToHandleMm: string;
 }
 
 export interface Quotation {
@@ -39,6 +81,7 @@ export interface Quotation {
 
 export const EMPTY_CONFIG: DoorConfig = {
   environment: '',
+  budget: '',
   flowType: '',
   gdprAccepted: false,
   material: '',
@@ -50,6 +93,8 @@ export const EMPTY_CONFIG: DoorConfig = {
   leafCount: 'Single',
   frameType: 'Timber',
   existingLock: 'Mortise',
+  existingLockId: '',
+  currentMortiseType: '',
   product: null,
   finish: 'Satin Chrome',
   quantity: '1',
@@ -58,6 +103,20 @@ export const EMPTY_CONFIG: DoorConfig = {
 
   backsetMm: '',
   centerToCenterMm: '',
+  accessMethods: [],
+
+  handlePosition: '',
+  handleType: '',
+  needsDeadbolt: false,
+  needsKeyholeFailover: false,
+  doubleSidedLock: false,
+  waterResistant: false,
+  hostingPreference: '',
+  connectivity: '',
+  usageTraffic: '',
+  readerColor: '',
+  spindleMm: '8',
+  cylinderToHandleMm: '',
 };
 
 @Component({

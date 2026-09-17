@@ -1,9 +1,10 @@
 ﻿<div class="switch-container">
   <header class="switch-header">
-    <h2>Switch Lock</h2>
+    <h2>SALTO Lock Collection</h2>
     <p>
+      Browse every SALTO lock we carry, and switch anytime.
       Your door: {{ config.material || 'Unknown' }}
-      · {{ config.width }}×{{ config.height }}mm
+      @if (config.thickness) { · {{ config.thickness }}mm thick }
     </p>
   </header>
 
@@ -34,172 +35,141 @@
       </div>
     }
 
-    @if (recommended.length > 0) {
-      <span class="section-label compatible">
-        ✓ COMPATIBLE WITH YOUR {{ (config.material || 'DOOR').toUpperCase() }}
-      </span>
+    <span class="section-label collection">
+      ALL SALTO LOCKS
+    </span>
 
-      <div class="product-grid">
-        @for (product of recommended; track product.id) {
-          <article
-            class="product-card"
-            [class.selected]="isSelected(product)"
-            (click)="selectProduct(product)">
+    <div class="product-grid">
+      @for (product of sortedProducts; track product.id) {
+        <article
+          class="product-card"
+          [class.selected]="isSelected(product)"
+          (click)="selectProduct(product)">
 
-            @if (product.badge) {
-              <div
-                class="product-badge"
-                [style.background]="getBrandColor(product.brand)">
-                {{ product.badge }}
-              </div>
-            }
-
-            <div class="product-img-wrap">
-              <img
-                class="product-img"
-                [src]="product.imageUrl"
-                [alt]="product.name">
-
-              <div
-                class="brand-overlay"
-                [style.background]="getBrandColor(product.brand)">
-                {{ product.brand }}
-              </div>
+          @if (isBestMatch(product)) {
+            <div class="product-badge best-match-badge">
+              Best Match for Your Door
             </div>
-
-            <div class="product-header">
-              <span class="product-name">{{ product.name }}</span>
-
-              <span
-                class="brand-chip"
-                [style.background]="getBrandColor(product.brand) + '18'"
-                [style.color]="getBrandColor(product.brand)">
-                {{ product.brand }}
-              </span>
+          } @else if (product.badge) {
+            <div
+              class="product-badge"
+              [style.background]="getBrandColor(product.brand)">
+              {{ product.badge }}
             </div>
+          }
 
-            <p class="product-tagline">{{ product.tagline }}</p>
+          <div class="product-img-wrap">
+            <img
+              class="product-img"
+              [src]="product.imageUrl"
+              [alt]="product.name">
 
-            <div class="thickness-row">
-              <mat-icon class="small-icon">straighten</mat-icon>
-              <span class="thickness-text">{{ product.thicknessRange }}</span>
+            <div
+              class="brand-overlay"
+              [style.background]="getBrandColor(product.brand)">
+              {{ product.brand }}
             </div>
+          </div>
 
-            <div class="features-row">
-              @for (feature of product.features; track feature) {
-                <span class="feature-chip">{{ feature }}</span>
-              }
-            </div>
+          <div class="product-header">
+            <span class="product-name">{{ product.name }}</span>
 
-            <mat-divider></mat-divider>
-
-            <div class="questions-section">
-              <div class="questions-header">
-                <mat-icon class="tiny-icon">help_outline</mat-icon>
-                <span class="questions-label">YOU MAY BE ASKED</span>
-              </div>
-
-              @for (question of product.aiQuestions; track question) {
-                <div class="question-item">• {{ question }}</div>
-              }
-            </div>
-
-            <mat-divider></mat-divider>
-
-            <div class="finish-row">
-              <div class="finish-left">
-                <span class="finish-label">FINISH</span>
-
-                <div class="swatches">
-                  @for (finish of product.finishes; track finish) {
-                    <button
-                      type="button"
-                      class="swatch"
-                      [class.swatch-selected]="isFinishSelected(product, finish)"
-                      [style.background]="getFinishColor(finish)"
-                      [title]="finish"
-                      (click)="selectFinish(product, finish, $event)">
-                    </button>
-                  }
-                </div>
-              </div>
-
-              <button
-                type="button"
-                class="spec-link"
-                [title]="product.specLabel"
-                (click)="$event.stopPropagation()">
-                {{ product.specLabel }}
-                <mat-icon class="tiny-icon">open_in_new</mat-icon>
-              </button>
-            </div>
-
-            @if (isSelected(product)) {
-              <button
-                mat-raised-button
-                color="primary"
-                class="view-ar-btn"
-                type="button"
-                (click)="$event.stopPropagation(); viewInAR.emit()">
-                <mat-icon>view_in_ar</mat-icon>
-                View in AR
-              </button>
-            }
-          </article>
-        }
-      </div>
-    }
-
-    @if (others.length > 0) {
-      <span class="section-label others">
-        OTHER OPTIONS (MAY NEED MODIFICATION)
-      </span>
-
-      <div class="product-grid">
-        @for (product of others; track product.id) {
-          <article
-            class="product-card compact"
-            [class.selected]="isSelected(product)"
-            (click)="selectProduct(product)">
-
-            <div class="product-header">
-              <span class="product-name">{{ product.name }}</span>
-
-              <span
-                class="brand-chip"
-                [style.background]="getBrandColor(product.brand) + '18'"
-                [style.color]="getBrandColor(product.brand)">
-                {{ product.brand }}
-              </span>
-            </div>
-
-            <p class="product-tagline">
-              {{ product.tagline }}
-            </p>
-
-            <div class="thickness-row">
-              <mat-icon class="small-icon">straighten</mat-icon>
-              <span class="thickness-text">
-                {{ product.thicknessRange }}
-              </span>
-            </div>
-
-            <span class="mod-chip">
-              May need modification
+            <span
+              class="brand-chip"
+              [style.background]="getBrandColor(product.brand) + '18'"
+              [style.color]="getBrandColor(product.brand)">
+              {{ product.brand }}
             </span>
-          </article>
-        }
-      </div>
-    }
+          </div>
+
+          <p class="product-tagline">{{ product.tagline }}</p>
+
+          <div class="thickness-row">
+            <mat-icon class="small-icon">straighten</mat-icon>
+            <span class="thickness-text">{{ product.thicknessRange }}</span>
+          </div>
+
+          <div class="features-row">
+            @for (feature of product.features; track feature) {
+              <span class="feature-chip">{{ feature }}</span>
+            }
+          </div>
+
+          <mat-divider></mat-divider>
+
+          <div class="questions-section">
+            <div class="questions-header">
+              <mat-icon class="tiny-icon">help_outline</mat-icon>
+              <span class="questions-label">YOU MAY BE ASKED</span>
+            </div>
+
+            @for (question of product.aiQuestions; track question) {
+              <div class="question-item">• {{ question }}</div>
+            }
+          </div>
+
+          <mat-divider></mat-divider>
+
+          <div class="finish-row">
+            <div class="finish-left">
+              <span class="finish-label">FINISH</span>
+
+              <div class="swatches">
+                @for (finish of product.finishes; track finish) {
+                  <button
+                    type="button"
+                    class="swatch"
+                    [class.swatch-selected]="isFinishSelected(product, finish)"
+                    [style.background]="getFinishColor(finish)"
+                    [title]="finish"
+                    (click)="selectFinish(product, finish, $event)">
+                  </button>
+                }
+              </div>
+            </div>
+
+            <button
+              type="button"
+              class="spec-link"
+              [title]="product.specLabel"
+              (click)="$event.stopPropagation()">
+              {{ product.specLabel }}
+              <mat-icon class="tiny-icon">open_in_new</mat-icon>
+            </button>
+          </div>
+
+          @if (isSelected(product)) {
+            <button
+              mat-raised-button
+              color="primary"
+              class="view-ar-btn"
+              type="button"
+              (click)="$event.stopPropagation(); viewInAR.emit()">
+              <mat-icon>view_in_ar</mat-icon>
+              View in AR
+            </button>
+          }
+        </article>
+      }
+    </div>
 
     <div class="reconfigure-row">
       <button
         mat-stroked-button
         type="button"
         class="reconfigure-btn"
+        (click)="editConfiguration.emit()">
+        <mat-icon>arrow_back</mat-icon>
+        Edit this configuration
+      </button>
+
+      <button
+        mat-stroked-button
+        type="button"
+        class="reconfigure-btn danger"
         (click)="restartWizard.emit()">
-        <mat-icon>tune</mat-icon>
-        Reconfigure door dimensions
+        <mat-icon>refresh</mat-icon>
+        Start a brand-new quote
       </button>
     </div>
 

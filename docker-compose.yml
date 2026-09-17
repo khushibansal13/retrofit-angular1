@@ -50,7 +50,7 @@
         condition: service_healthy
     entrypoint: >
       sh -c "
-      for m in qwen2.5vl:3b moondream llava-phi3 gemma3:4b; do
+      for m in qwen2.5vl:3b qwen2.5vl:7b; do
         echo \"Pulling $$m...\";
         curl -s http://ollama:11434/api/pull -d \"{\\\"name\\\":\\\"$$m\\\"}\";
         echo;

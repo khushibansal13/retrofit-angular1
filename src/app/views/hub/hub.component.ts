@@ -98,14 +98,15 @@ export class HubComponent {
     this.restartWizard.emit();
   }
 
-  onARChangeTab(index: number): void {
-    // AR's existing back button emits tab 1. In the Hub that means
-    // "leave AR and edit this configuration", not "open Quotes".
-    if (index === 1) {
-      this.editConfiguration.emit();
-      return;
-    }
+  // The AR viewer's own back button — a real, non-destructive way back to
+  // the wizard. Previously nothing in the UI ever triggered this at all;
+  // the only "back" available was Switch Lock's reconfigure button, which
+  // wipes the whole configuration via restartWizard instead.
+  onExitAr(): void {
+    this.editConfiguration.emit();
+  }
 
-    this.setTab(index);
+  onEditConfiguration(): void {
+    this.editConfiguration.emit();
   }
 }

@@ -19,6 +19,12 @@ export interface DoorVisionLock
   deadbolt_present: boolean;
 }
 
+export interface DoorVisionHandle
+  extends DoorVisionComponent {
+  handle_position: string;
+  handle_type: string;
+}
+
 export interface DoorVisionProfile {
   door_material: string;
   material_confidence: number;
@@ -39,7 +45,7 @@ export interface DoorVisionProfile {
 
   frame: DoorVisionComponent;
 
-  handle: DoorVisionComponent;
+  handle: DoorVisionHandle;
 
   measured_thickness_mm: number | null;
 
@@ -89,7 +95,8 @@ export interface DoorVisionResult {
 export interface ManualDoorRecommendationRequest {
   door_material:
     | 'Wood'
-    | 'Glass';
+    | 'Glass'
+    | 'Metal';
 
   door_thickness_mm: number;
 
@@ -112,6 +119,11 @@ export interface CheckCompatibilityRequest {
   backset_mm?: number | null;
 
   center_to_center_mm?: number | null;
+
+  // When the customer confirms/corrects the AI-detected lock type on the
+  // "here's what we found" screen, this overrides profile.lock/door_standard
+  // server-side using the same mapping the manual flow uses.
+  existing_lock?: string;
 }
 
 @Injectable({

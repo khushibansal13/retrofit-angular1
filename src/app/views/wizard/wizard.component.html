@@ -36,7 +36,7 @@
               {{ i + 1 }}
             }
           </span>
-          <span class="progress-label">{{ step.label }}</span>
+          <span class="progress-label">{{ step.shortLabel }}</span>
         </button>
       }
     </nav>
@@ -46,22 +46,67 @@
     @if (screen === 'environment') {
       <section class="screen-card environment-screen">
         <div class="eyebrow">START HERE</div>
-        <h1>Where are you installing?</h1>
-        <p class="intro">Select your installation environment. Door material and type will be detected automatically from your photo, or you can enter them manually in the next step.</p>
+        <h1>Tell us about the business</h1>
+        <p class="intro">This helps us shortlist the right lock family and features for you. Door details come next.</p>
 
-        <div class="environment-grid">
-          @for (env of environments; track env.id) {
-            <button type="button" class="environment-card" [class.selected]="config.environment === env.id" (click)="selectEnvironment(env.id)">
-              <span class="environment-icon"><mat-icon>{{ env.icon }}</mat-icon></span>
-              <span class="environment-name">{{ env.label }}</span>
-              <span class="environment-desc">{{ env.desc }}</span>
-            </button>
-          }
+        <div class="biz-dots">
+          <button type="button" class="biz-dot" [class.active]="bizStep === 0" (click)="goToBizStep(0)">1 · What's this for?</button>
+          <button type="button" class="biz-dot" [class.active]="bizStep === 1" [disabled]="!config.environment" (click)="goToBizStep(1)">2 · Budget</button>
+          <button type="button" class="biz-dot" [class.active]="bizStep === 2" [disabled]="!config.environment" (click)="goToBizStep(2)">3 · Usage</button>
+        </div>
+
+        <div class="biz-carousel">
+          <div class="biz-track" [style.transform]="'translateX(' + (-bizStep * 100) + '%)'">
+            <div class="biz-slide">
+              <div class="environment-grid compact">
+                @for (domain of businessDomains; track domain.id) {
+                  <button type="button" class="environment-card" [class.selected]="config.environment === domain.id" (click)="selectBusinessDomain(domain.id)">
+                    <span class="environment-icon"><mat-icon>{{ domain.icon }}</mat-icon></span>
+                    <span class="environment-name">{{ domain.label }}</span>
+                    <span class="environment-desc">{{ domain.desc }}</span>
+                  </button>
+                }
+              </div>
+            </div>
+
+            <div class="biz-slide">
+              <div class="budget-grid">
+                @for (budget of budgetOptions; track budget.id) {
+                  <button type="button" class="budget-card" [class.selected]="config.budget === budget.id" (click)="selectBudget(budget.id)">
+                    <span class="budget-icon"><mat-icon>{{ budget.icon }}</mat-icon></span>
+                    <span class="budget-name">{{ budget.label }}</span>
+                    <span class="budget-desc">{{ budget.desc }}</span>
+                  </button>
+                }
+              </div>
+              <button type="button" class="text-button" (click)="goToBizStep(0)"><mat-icon>arrow_back</mat-icon> Back to business type</button>
+            </div>
+
+            <div class="biz-slide">
+              <div class="field-section-title">How often will this door be used?</div>
+              <p class="field-help">This helps us flag doors that need a higher-capacity battery.</p>
+              <div class="choice-pill-row">
+                @for (option of usageTrafficOptions; track option.value) {
+                  <button type="button" class="choice-pill" [class.active]="config.usageTraffic === option.value" (click)="set('usageTraffic', option.value)">
+                    <strong>{{ option.label }}</strong>
+                    <small>{{ option.hint }}</small>
+                  </button>
+                }
+              </div>
+              @if (showHighTrafficAdvisory) {
+                <div class="ai-note">
+                  <mat-icon>battery_alert</mat-icon>
+                  <div><strong>High-traffic tip:</strong> these doors drain batteries faster — ask about our extended-battery cylinder, which also ships with backup keys.</div>
+                </div>
+              }
+              <button type="button" class="text-button" (click)="goToBizStep(1)"><mat-icon>arrow_back</mat-icon> Back to budget</button>
+            </div>
+          </div>
         </div>
 
         <div class="ai-note">
           <mat-icon>auto_awesome</mat-icon>
-          <div><strong>AI will detect</strong> door material, style, existing lock type, handing, and frame details automatically from your photo in the next step.</div>
+          <div><strong>AI will detect</strong> door material, style, existing lock type, handing, and handle details automatically from your photo in the next step.</div>
         </div>
 
         <button type="button" class="primary-button full" [disabled]="!config.environment" (click)="continueFromEnvironment()">Continue <mat-icon>arrow_forward</mat-icon></button>
@@ -72,7 +117,7 @@
       <section class="screen-card details-screen">
         <div class="step-back-row">
           <button type="button" class="text-button" (click)="goBack()">
-            <mat-icon>arrow_back</mat-icon> Installation
+            <mat-icon>arrow_back</mat-icon> Business Profile
           </button>
         </div>
         @if (detailsMode === 'choice') {
@@ -83,14 +128,14 @@
             <button type="button" class="choice-card scan-choice" (click)="openScan()">
               <span class="choice-icon blue"><mat-icon>document_scanner</mat-icon></span>
               <span class="choice-title">Scan Door Photo</span>
-              <span class="choice-copy">Upload 1–5 door photos — AI detects material, door profile, lock type, and frame details.</span>
+              <span class="choice-copy">Upload 1–5 door photos — AI detects material, door profile, lock type, and handle details.</span>
               <span class="tag-row"><span>Auto-detects material</span><span>Analyses door profile</span><span>Faster setup</span></span>
               <span class="choice-action primary-outline"><mat-icon>camera_alt</mat-icon> Scan my door</span>
             </button>
             <button type="button" class="choice-card" (click)="openManual()">
               <span class="choice-icon slate"><mat-icon>edit</mat-icon></span>
               <span class="choice-title">Enter Manually</span>
-              <span class="choice-copy">Know your door thickness, width, and material? Enter the details directly in the guided form.</span>
+              <span class="choice-copy">Know your door thickness and material? Enter the details directly in the guided form.</span>
               <span class="tag-row"><span>Full control</span><span>No photo needed</span><span>Edit anytime</span></span>
               <span class="choice-action"><mat-icon>straighten</mat-icon> Enter door details</span>
             </button>
@@ -102,16 +147,20 @@
           <div class="eyebrow">AI SCAN</div>
           <h1>Scan your door</h1>
           <p class="intro">Take a photo or upload an existing image. AI will extract door parameters automatically.</p>
-          <div class="scan-info"><mat-icon>auto_fix_high</mat-icon><div>Using <strong>visual profiling</strong> to detect material, door profile, lock type, and frame details.</div></div>
-          <div class="scan-panel">
+          <div class="scan-info"><mat-icon>auto_fix_high</mat-icon><div>Using <strong>visual profiling</strong> to detect material, door profile, lock type, and handle details.</div></div>
+<div class="scan-panel">
             <div class="scan-illustration"><mat-icon>door_front</mat-icon><span>{{ selectedFiles.length ? selectedFiles.length + ' photos selected' : '1–5 door photos required' }}</span></div>
             <button type="button" class="primary-button" (click)="openFilePicker()"><mat-icon>cloud_upload</mat-icon> Upload door photos</button>
             <button type="button" class="secondary-button" (click)="openFilePicker()"><mat-icon>photo_camera</mat-icon> Use camera</button>
           </div>
+          <div class="ai-note">
+            <mat-icon>tips_and_updates</mat-icon>
+            <div><strong>Best results:</strong> include one clear photo of the whole door, plus one close-up of the lock/handle hardware — close-ups let the AI read small details (brand text, deadbolts, keyholes) far more accurately than a wide shot alone.</div>
+          </div>
           @if (selectedFiles.length) {
             <div class="small-note">{{ selectedFiles.length }} image{{ selectedFiles.length !== 1 ? 's' : '' }} ready for analysis.</div>
           } @else {
-            <div class="small-note">Select between 1 and 5 clear photos showing the door, frame, and existing lock.</div>
+            <div class="small-note">Select between 1 and 5 clear photos showing the door and existing lock.</div>
           }
           @if (scanError) {
             <div class="scan-error"><mat-icon>error</mat-icon><span>{{ scanError }}</span></div>
@@ -160,8 +209,32 @@
             <div class="detected-card"><mat-icon>texture</mat-icon><div><strong>{{ detectedProfile?.material }}</strong><span>Door material · {{ detectedProfile?.materialConf }}% confidence</span></div></div>
             <div class="detected-card"><mat-icon>door_front</mat-icon><div><strong>{{ detectedProfile?.doorStyle }}</strong><span>Door style · {{ detectedProfile?.styleConf }}% confidence</span></div></div>
             <div class="detected-card"><mat-icon>lock</mat-icon><div><strong>{{ detectedProfile?.existingLock }}</strong><span>Existing lock · {{ detectedProfile?.lockConf }}% confidence</span></div></div>
-            <div class="detected-card"><mat-icon>crop_free</mat-icon><div><strong>Frame detected</strong><span>Frame profile · {{ detectedProfile?.frameConf }}% confidence</span></div></div>
             <div class="detected-card"><mat-icon>compare_arrows</mat-icon><div><strong>{{ detectedProfile?.handing }}</strong><span>Handing · {{ detectedProfile?.handingConf }}% confidence</span></div></div>
+            @if (detectedProfile?.stileWidth) {
+              <div class="detected-card"><mat-icon>straighten</mat-icon><div><strong>{{ detectedProfile?.stileWidth }}</strong><span>Stile width</span></div></div>
+            }
+            @if (detectedProfile?.handlePosition || detectedProfile?.handleType) {
+              <div class="detected-card"><mat-icon>drag_handle</mat-icon><div><strong>{{ detectedProfile?.handlePosition || '—' }} @if (detectedProfile?.handleType) { · {{ detectedProfile?.handleType }} }</strong><span>Handle position & type</span></div></div>
+            }
+            @if (detectedProfile?.frameEvidence) {
+              <div class="detected-card"><mat-icon>crop_free</mat-icon><div><strong>Frame notes</strong><span>{{ detectedProfile?.frameEvidence }}</span></div></div>
+            }
+            @if (detectedProfile?.handleEvidence) {
+              <div class="detected-card"><mat-icon>back_hand</mat-icon><div><strong>Handle notes</strong><span>{{ detectedProfile?.handleEvidence }}</span></div></div>
+            }
+            @if (detectedProfile?.backsetMm != null || detectedProfile?.centerToCenterMm != null) {
+              <div class="detected-card">
+                <mat-icon>rule</mat-icon>
+                <div>
+                  <strong>
+                    @if (detectedProfile?.backsetMm != null) { Backset ≈ {{ detectedProfile?.backsetMm }}mm }
+                    @if (detectedProfile?.backsetMm != null && detectedProfile?.centerToCenterMm != null) { · }
+                    @if (detectedProfile?.centerToCenterMm != null) { Center-to-center ≈ {{ detectedProfile?.centerToCenterMm }}mm }
+                  </strong>
+                  <span>AI estimate from photos — you'll confirm on the next screen</span>
+                </div>
+              </div>
+            }
           </div>
           <p class="field-help">Low-confidence or "Unknown" readings are normal from a single photo — confirm or correct them on the next screen.</p>
           <div class="detected-actions"><button type="button" class="secondary-button" (click)="openManual()">Edit details</button><button type="button" class="primary-button" (click)="useDetectedDetails()">Continue <mat-icon>arrow_forward</mat-icon></button></div>
@@ -173,8 +246,22 @@
             <button type="button" class="scan-instead" (click)="openScan()"><mat-icon>document_scanner</mat-icon> Scan instead</button>
           </div>
 
+          @if (detectedProfile) {
+            <div class="ai-detected-banner">
+              <mat-icon>auto_awesome</mat-icon>
+              <div>
+                <strong>AI detected:</strong>
+                {{ detectedProfile.material }} door
+                @if (detectedProfile.existingLock) { · {{ detectedProfile.existingLock }} }
+                @if (config.thickness) { · {{ config.thickness }}mm thick }
+                @if (detectedProfile.handing && detectedProfile.handing !== 'Unknown') { · {{ detectedProfile.handing }} handing }
+                <span class="ai-detected-edit-note">Everything below is editable — adjust anything that doesn't look right.</span>
+              </div>
+            </div>
+          }
+
           <div class="field-section-title">Door material</div>
-          <p class="field-help">Supports Wooden and Glass door profiles.</p>
+          <p class="field-help">Supports Wood, Glass, and Metal door profiles.</p>
           <div class="material-grid">
             @for (material of materials; track material.id) {
               <button type="button" class="material-card" [class.selected]="config.material === material.id" (click)="setMaterial(material.id)">
@@ -185,52 +272,102 @@
 
           <div class="section-divider"></div>
 
+          <div class="field-section-title">What does your current lock look like?</div>
+          <p class="field-help">This is the single biggest factor in which SALTO lock will fit your door — pick the closest match.</p>
+          <div class="locktype-grid">
+            @for (option of lockTypeOptions; track option.id) {
+              <button type="button" class="locktype-card" [class.selected]="config.existingLockId === option.id" (click)="selectLockType(option)">
+                <span class="locktype-icon"><mat-icon>{{ option.icon }}</mat-icon></span>
+                <span class="locktype-label">{{ option.label }}</span>
+                <span class="locktype-desc">{{ option.desc }}</span>
+              </button>
+            }
+          </div>
+
+          <label class="input-field mortise-field">
+            <span>Which mortise or lock brand is currently installed? (optional)</span>
+            <div><input type="text" placeholder="e.g. Yale, ASSA ABLOY, unbranded, not sure" [(ngModel)]="config.currentMortiseType" (ngModelChange)="set('currentMortiseType', $event)"></div>
+            <small>Helps our installer check whether your existing mortise case can be reused instead of replaced.</small>
+          </label>
+
+          <div class="section-divider"></div>
+
           @if (isGlass) { <div class="glass-note"><mat-icon>info</mat-icon><span><strong>Glass door note:</strong> Standard toughened glass is 8–14mm thick.</span></div> }
+          @if (isMetal) { <div class="glass-note"><mat-icon>info</mat-icon><span><strong>Metal door note:</strong> Steel/aluminium security doors are typically 40–70mm thick.</span></div> }
 
           <div class="door-diagram-wrap">
-            <div class="door-diagram" [class.glass]="isGlass">
+            <div class="door-diagram" [class.glass]="isGlass" [class.metal]="isMetal">
               <span class="thickness-badge">{{ config.thickness || '—' }} mm thick</span>
-              <mat-icon>{{ isGlass ? 'window' : 'door_front' }}</mat-icon>
-              <span class="width-line"><i></i><b>{{ config.width || '—' }} mm</b><i></i></span>
-              <span class="height-line"><i></i><b>{{ config.height || '—' }} mm</b><i></i></span>
+              <mat-icon>{{ isGlass ? 'window' : (isMetal ? 'security' : 'door_front') }}</mat-icon>
             </div>
           </div>
 
-          <div class="measure-grid">
-            <label class="input-field"><span>Width</span><div><input type="number" [(ngModel)]="config.width" (ngModelChange)="set('width', $event)"><em>mm</em></div></label>
-            <label class="input-field"><span>Height</span><div><input type="number" [(ngModel)]="config.height" (ngModelChange)="set('height', $event)"><em>mm</em></div></label>
-            <label class="input-field"><span>Thickness</span><div><input type="number" [(ngModel)]="config.thickness" (ngModelChange)="set('thickness', $event)"><em>mm</em></div><small>{{ isGlass ? 'Typical 8–14mm' : 'Typical 35–50mm' }}</small></label>
-          </div>
+          <label class="input-field door-thickness-field"><span>Door thickness</span><div><input type="number" [(ngModel)]="config.thickness" (ngModelChange)="set('thickness', $event)"><em>mm</em></div><small>{{ isGlass ? 'Typical 8–14mm' : (isMetal ? 'Typical 40–70mm' : 'Typical 35–50mm') }}</small></label>
 
           <div class="options-grid">
             <div><div class="option-label">OPENING DIRECTION</div><div class="pill-row">@for (direction of directions; track direction) { <button type="button" [class.active]="config.direction === direction" (click)="set('direction', direction)">{{ direction }}</button> }</div></div>
             <div><div class="option-label">LEAF COUNT</div><div class="pill-row">@for (leaf of leafCounts; track leaf) { <button type="button" [class.active]="config.leafCount === leaf" (click)="set('leafCount', leaf)">{{ leaf }}</button> }</div></div>
           </div>
 
-          <div class="section-divider"></div>
-
-          <button type="button" class="advanced-toggle" (click)="toggleAdvancedDetails()">
-            <mat-icon>{{ showAdvancedDetails ? 'expand_less' : 'tune' }}</mat-icon>
-            {{ showAdvancedDetails ? 'Hide advanced installer details' : 'Add advanced installer details (optional)' }}
-          </button>
-          <p class="field-help">Backset and center-to-center spacing sharpen the compatibility check further — skip these if you don't have them.</p>
-
-          @if (showAdvancedDetails) {
-            <div class="advanced-grid">
-              <label class="input-field">
-                <span>Backset</span>
-                <div><input type="number" [(ngModel)]="config.backsetMm" (ngModelChange)="set('backsetMm', $event)"><em>mm</em></div>
-                <small>Typically 60 or 70mm</small>
-              </label>
-              <label class="input-field">
-                <span>Center-to-center</span>
-                <div><input type="number" [(ngModel)]="config.centerToCenterMm" (ngModelChange)="set('centerToCenterMm', $event)"><em>mm</em></div>
-                <small>Interconnected deadbolts only</small>
-              </label>
+          @if (showBacksetQuestion) {
+            <div class="section-divider"></div>
+            <div class="choice-question">
+              <div class="choice-question-title">Where's the middle of your lock hole? <span>(installers call this the "backset")</span></div>
+              <p class="field-help">In plain terms: measure from the edge of the door to the center of the round hole where the knob/bolt sits. Not sure? Just skip it — it's optional.</p>
+              <svg class="measure-diagram" viewBox="0 0 160 60" fill="none">
+                <line x1="18" y1="6" x2="18" y2="54" stroke="currentColor" stroke-width="3"/>
+                <circle cx="100" cy="30" r="9" stroke="currentColor" stroke-width="2.5"/>
+                <line x1="18" y1="30" x2="91" y2="30" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3"/>
+                <path d="M18 24 L18 36 M18 30 L24 27 M18 30 L24 33" stroke="currentColor" stroke-width="1.5"/>
+                <text x="45" y="22" font-size="9" fill="currentColor">backset</text>
+              </svg>
+              @if (isAiSuppliedValue(config.backsetMm, backsetOptions)) {
+                <div class="ai-detected-note"><mat-icon>auto_awesome</mat-icon> AI estimated {{ config.backsetMm }}mm from your photos — tap a size below if this looks wrong, or leave as-is.</div>
+              }
+              <div class="choice-pill-row">
+                @for (option of backsetOptions; track option.value) {
+                  <button type="button" class="choice-pill" [class.active]="config.backsetMm === option.value" (click)="selectBackset(option.value)">
+                    <strong>{{ option.label }}</strong>
+                    <small>{{ option.hint }}</small>
+                  </button>
+                }
+                <button type="button" class="choice-pill" [class.active]="!config.backsetMm" (click)="selectBackset('')">
+                  <strong>Not sure</strong>
+                  <small>Skip this one</small>
+                </button>
+              </div>
             </div>
           }
 
-          <button type="button" class="primary-button full" [disabled]="!config.material || !config.width || !config.height || !config.thickness" (click)="continueFromDetails()">Continue to smart locks <mat-icon>arrow_forward</mat-icon></button>
+          @if (showCenterToCenter) {
+            <div class="choice-question">
+              <div class="choice-question-title">How far apart are the deadbolt and handle? <span>(center-to-center)</span></div>
+              <p class="field-help">Measure between the middle of the deadbolt hole and the middle of the handle hole. Not sure? Just skip it — it's optional.</p>
+              <svg class="measure-diagram" viewBox="0 0 160 60" fill="none">
+                <circle cx="35" cy="30" r="9" stroke="currentColor" stroke-width="2.5"/>
+                <circle cx="120" cy="30" r="9" stroke="currentColor" stroke-width="2.5"/>
+                <line x1="44" y1="30" x2="111" y2="30" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3"/>
+                <text x="55" y="22" font-size="9" fill="currentColor">center-to-center</text>
+              </svg>
+              @if (isAiSuppliedValue(config.centerToCenterMm, centerToCenterOptions)) {
+                <div class="ai-detected-note"><mat-icon>auto_awesome</mat-icon> AI estimated {{ config.centerToCenterMm }}mm from your photos — tap a size below if this looks wrong, or leave as-is.</div>
+              }
+              <div class="choice-pill-row">
+                @for (option of centerToCenterOptions; track option.value) {
+                  <button type="button" class="choice-pill" [class.active]="config.centerToCenterMm === option.value" (click)="selectCenterToCenter(option.value)">
+                    <strong>{{ option.label }}</strong>
+                    <small>{{ option.hint }}</small>
+                  </button>
+                }
+                <button type="button" class="choice-pill" [class.active]="!config.centerToCenterMm" (click)="selectCenterToCenter('')">
+                  <strong>Not sure</strong>
+                  <small>Skip this one</small>
+                </button>
+              </div>
+            </div>
+          }
+
+          <button type="button" class="primary-button full" [disabled]="!config.material || (!analysisResult && !config.existingLockId) || !config.thickness" (click)="continueFromDetails()">Continue to smart locks <mat-icon>arrow_forward</mat-icon></button>
         }
       </section>
     }
@@ -403,11 +540,7 @@
                 getProduct(recommendation.product_id);
                 as product
                 ) {
-                <article
-                  class="product-card"
-                  [class.selected]="config.product === product.id"
-                  (click)="selectRecommendation(recommendation)"
-                >
+                <article class="product-card other">
                   @if (product.badge) {
                     <span class="product-badge">
                   {{ product.badge }}
@@ -470,56 +603,6 @@
                         </span>
                           }
                         </div>
-                      </div>
-                    }
-
-                    <div class="product-bottom">
-                      <div>
-                        <small>FINISH</small>
-
-                        <div class="finish-row">
-                          @for (
-                            finish of product.finishes;
-                            track finish
-                            ) {
-                            <button
-                              type="button"
-                              class="finish-dot"
-                              [title]="finish"
-                              [style.background]="
-                            finishColor(finish)
-                          "
-                              [class.active]="
-                            config.product === product.id &&
-                            config.finish === finish
-                          "
-                              (click)="
-                            $event.stopPropagation();
-                            selectFinish(product, finish)
-                          "
-                            ></button>
-                          }
-                        </div>
-                      </div>
-
-                      <span class="spec-link">
-                    {{ product.specLabel }}
-                        <mat-icon>
-                      open_in_new
-                    </mat-icon>
-                  </span>
-                    </div>
-
-                    @if (
-                      config.product === product.id
-                      ) {
-                      <div class="selected-line">
-                        <mat-icon>
-                          check_circle
-                        </mat-icon>
-
-                        Selected —
-                        {{ config.finish }}
                       </div>
                     }
                   </div>
@@ -589,38 +672,6 @@
                         }
                       </div>
                     </div>
-
-                    <div class="product-bottom">
-                      <div>
-                        <small>FINISH</small>
-
-                        <div class="finish-row">
-                          @for (
-                            finish of product.finishes;
-                            track finish
-                            ) {
-                            <button
-                              type="button"
-                              class="finish-dot"
-                              [title]="finish"
-                              [style.background]="
-                            finishColor(finish)
-                          "
-                              (click)="
-                            $event.stopPropagation()
-                          "
-                            ></button>
-                          }
-                        </div>
-                      </div>
-
-                      <span class="spec-link">
-                    {{ product.specLabel }}
-                        <mat-icon>
-                      open_in_new
-                    </mat-icon>
-                  </span>
-                    </div>
                   </div>
                 </article>
               }
@@ -642,12 +693,158 @@
         <button
           type="button"
           class="primary-button full"
-          [disabled]="!config.product"
+          [disabled]="!config.product || !isProductCompatible(config.product)"
           (click)="continueFromLock()"
         >
-          Review configuration
+          Continue
           <mat-icon>arrow_forward</mat-icon>
         </button>
+      </section>
+    }
+
+    @if (screen === 'specs') {
+      <section class="screen-card specs-screen">
+        <div class="step-back-row">
+          <button type="button" class="text-button" (click)="goBack()">
+            <mat-icon>arrow_back</mat-icon> Smart lock
+          </button>
+        </div>
+
+        <div class="eyebrow">OPTIONAL — HELPS OUR SALES & INSTALL TEAM</div>
+        <h1>A few extra details</h1>
+        <p class="intro">None of this changes which lock fits your door — skip anything you don't know. It just helps us prep the right kit and configuration for your quote.</p>
+
+        <div class="field-section-title">Where's the handle positioned?</div>
+        <p class="field-help">This tells us whether your prep is ANSI, DIN, or Scandinavian standard.</p>
+        @if (detectedProfile?.handlePosition) {
+          <div class="ai-detected-note"><mat-icon>auto_awesome</mat-icon> AI suggested "{{ detectedProfile?.handlePosition }}" from your photos — tap a card to confirm or correct it.</div>
+        }
+        <div class="locktype-grid">
+          @for (option of handlePositionOptions; track option.id) {
+            <button type="button" class="locktype-card" [class.selected]="config.handlePosition === option.id" (click)="set('handlePosition', option.id)">
+              <span class="locktype-icon"><mat-icon>{{ option.icon }}</mat-icon></span>
+              <span class="locktype-label">{{ option.label }}</span>
+              <span class="locktype-desc">{{ option.desc }}</span>
+            </button>
+          }
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="field-section-title">Security & access</div>
+        <div class="access-method-grid">
+          <button type="button" class="access-method-card" [class.selected]="config.needsDeadbolt" (click)="set('needsDeadbolt', !config.needsDeadbolt)">
+            <span class="access-method-check"><mat-icon>{{ config.needsDeadbolt ? 'check_box' : 'check_box_outline_blank' }}</mat-icon></span>
+            <span class="access-method-icon"><mat-icon>lock</mat-icon></span>
+            <span class="access-method-label">Add a thumb-turn deadbolt</span>
+            <span class="access-method-desc">A physical deadbolt alongside the smart lock</span>
+          </button>
+
+          @if (!isHotel) {
+            <button type="button" class="access-method-card" [class.selected]="config.needsKeyholeFailover" (click)="set('needsKeyholeFailover', !config.needsKeyholeFailover)">
+              <span class="access-method-check"><mat-icon>{{ config.needsKeyholeFailover ? 'check_box' : 'check_box_outline_blank' }}</mat-icon></span>
+              <span class="access-method-icon"><mat-icon>key</mat-icon></span>
+              <span class="access-method-label">Mechanical key backup</span>
+              <span class="access-method-desc">A physical keyhole failover if electronics fail</span>
+            </button>
+          } @else {
+            <div class="access-method-card disabled">
+              <span class="access-method-icon"><mat-icon>block</mat-icon></span>
+              <span class="access-method-label">Mechanical key backup</span>
+              <span class="access-method-desc">Not usually offered for hotels — guest key security policy</span>
+            </div>
+          }
+
+          <button type="button" class="access-method-card" [class.selected]="config.doubleSidedLock" (click)="set('doubleSidedLock', !config.doubleSidedLock)">
+            <span class="access-method-check"><mat-icon>{{ config.doubleSidedLock ? 'check_box' : 'check_box_outline_blank' }}</mat-icon></span>
+            <span class="access-method-icon"><mat-icon>sync_alt</mat-icon></span>
+            <span class="access-method-label">Lock/unlock from both sides</span>
+            <span class="access-method-desc">{{ isHotel ? 'Common for hotel guest rooms' : 'Double-sided locking control' }}</span>
+          </button>
+
+          <button type="button" class="access-method-card" [class.selected]="config.waterResistant" (click)="set('waterResistant', !config.waterResistant)">
+            <span class="access-method-check"><mat-icon>{{ config.waterResistant ? 'check_box' : 'check_box_outline_blank' }}</mat-icon></span>
+            <span class="access-method-icon"><mat-icon>water_drop</mat-icon></span>
+            <span class="access-method-label">Exposed to rain/weather</span>
+            <span class="access-method-desc">Exterior or weather-exposed door</span>
+          </button>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="field-section-title">Platform & connectivity</div>
+        <div class="choice-pill-row">
+          @for (option of hostingOptions; track option.value) {
+            <button type="button" class="choice-pill" [class.active]="config.hostingPreference === option.value" (click)="set('hostingPreference', option.value)">
+              <strong>{{ option.label }}</strong>
+              <small>{{ option.hint }}</small>
+            </button>
+          }
+        </div>
+        <div class="choice-pill-row">
+          @for (option of connectivityOptions; track option.value) {
+            <button type="button" class="choice-pill" [class.active]="config.connectivity === option.value" (click)="set('connectivity', option.value)">
+              <strong>{{ option.label }}</strong>
+              <small>{{ option.hint }}</small>
+            </button>
+          }
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="field-section-title">Handle & finish</div>
+        @if (detectedProfile?.handleType) {
+          <div class="ai-detected-note"><mat-icon>auto_awesome</mat-icon> AI suggested "{{ detectedProfile?.handleType }}" from your photos — tap a pill to confirm or correct it.</div>
+        }
+        <div class="choice-pill-row">
+          @for (option of handleTypeOptions; track option.value) {
+            <button type="button" class="choice-pill" [class.active]="config.handleType === option.value" (click)="set('handleType', option.value)">
+              <strong>{{ option.label }}</strong>
+              <small>{{ option.hint }}</small>
+            </button>
+          }
+        </div>
+        <label class="input-field reader-color-field">
+          <span>Reader / credential color</span>
+          <div class="finish-row">
+            @for (color of readerColors; track color) {
+              <button type="button" class="finish-dot" [title]="color" [style.background]="finishColor(color)" [class.active]="config.readerColor === color" (click)="set('readerColor', color)"></button>
+            }
+          </div>
+        </label>
+
+        <div class="measure-grid">
+          <label class="input-field">
+            <span>Spindle size</span>
+            <div><input type="number" [(ngModel)]="config.spindleMm" (ngModelChange)="set('spindleMm', $event)"><em>mm</em></div>
+            <small>Usually fine to leave at 8mm — your installer will confirm.</small>
+          </label>
+        </div>
+
+        <div class="choice-question">
+          <div class="choice-question-title">Distance from the keyhole to the handle <span>(cylinder-to-handle)</span></div>
+          <svg class="measure-diagram" viewBox="0 0 160 60" fill="none">
+            <circle cx="35" cy="30" r="9" stroke="currentColor" stroke-width="2.5"/>
+            <circle cx="120" cy="30" r="9" stroke="currentColor" stroke-width="2.5"/>
+            <line x1="44" y1="30" x2="111" y2="30" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <text x="60" y="22" font-size="9" fill="currentColor">distance</text>
+          </svg>
+          <label class="input-field">
+            <span>Distance (optional)</span>
+            <div><input type="number" [(ngModel)]="config.cylinderToHandleMm" (ngModelChange)="set('cylinderToHandleMm', $event)"><em>mm</em></div>
+          </label>
+        </div>
+
+        <div class="section-divider"></div>
+        <div class="ai-note">
+          <mat-icon>build</mat-icon>
+          <div>We'll try to reuse your existing mortise case where possible — the lock type and mortise brand you gave earlier help us match the right external body to your existing internal lock.</div>
+        </div>
+
+        <div class="specs-actions">
+          <button type="button" class="secondary-button" (click)="continueFromSpecs()">Skip for now</button>
+          <button type="button" class="primary-button" (click)="continueFromSpecs()">Continue to review <mat-icon>arrow_forward</mat-icon></button>
+        </div>
       </section>
     }
 
@@ -655,7 +852,7 @@
       <section class="screen-card bom-screen">
         <div class="step-back-row">
           <button type="button" class="text-button" (click)="goBack()">
-            <mat-icon>arrow_back</mat-icon> Smart lock
+            <mat-icon>arrow_back</mat-icon> Extra details
           </button>
         </div>
         <div class="eyebrow">FINAL REVIEW</div>
@@ -663,28 +860,43 @@
         <p class="intro">Review your configuration, confirm quantity, and generate a formal quotation.</p>
 
         @if (selectedProduct) {
-          <div class="fit-alert" [class.success]="fit" [class.error]="!fit"><mat-icon>{{ fit ? 'check_circle' : 'error' }}</mat-icon><div><strong>{{ fit ? 'Fit Confirmed ✓' : 'Fit Issue ✗' }}</strong><span>{{ selectedProduct.name }} supports {{ selectedProduct.thicknessRange }} and your door is {{ config.thickness }}mm.</span></div></div>
+          <div class="confirm-card">
+            <mat-icon>check_circle</mat-icon>
+            <div><strong>Ready to quote</strong><span>{{ selectedProduct.name }} fits your {{ config.thickness }}mm {{ config.material }} door.</span></div>
+          </div>
           <div class="selected-lock-card">
             <img [src]="selectedProduct.imageUrl" [alt]="selectedProduct.name">
             <div>
               <small>SELECTED LOCK</small>
               <h2>{{ selectedProduct.name }}</h2>
               <p>Finish: {{ config.finish }} · Thickness: {{ config.thickness }}mm</p>
-              <p>{{ config.material }} door · {{ config.environment }} · {{ config.direction }}</p>
-              @if (config.backsetMm || config.centerToCenterMm) {
+              <p>{{ config.material }} door · {{ config.environment }}</p>
+              @if (bomExtraSpecChips.length) {
                 <div class="bom-extra-specs">
-                  @if (config.backsetMm) { <span>Backset {{ config.backsetMm }}mm</span> }
-                  @if (config.centerToCenterMm) { <span>Center-to-center {{ config.centerToCenterMm }}mm</span> }
+                  @for (chip of bomExtraSpecChips; track chip) { <span>{{ chip }}</span> }
                 </div>
               }
             </div>
           </div>
         }
 
+        <div class="field-section-title">How do you want to unlock it?</div>
+        <p class="field-help">Pick all that apply — this only changes what's included in your kit, not which lock you're getting.</p>
+        <div class="access-method-grid">
+          @for (option of accessMethodOptions; track option.id) {
+            <button type="button" class="access-method-card" [class.selected]="isAccessMethodSelected(option.id)" (click)="toggleAccessMethod(option.id)">
+              <span class="access-method-check"><mat-icon>{{ isAccessMethodSelected(option.id) ? 'check_box' : 'check_box_outline_blank' }}</mat-icon></span>
+              <span class="access-method-icon"><mat-icon>{{ option.icon }}</mat-icon></span>
+              <span class="access-method-label">{{ option.label }}</span>
+              <span class="access-method-desc">{{ option.desc }}</span>
+            </button>
+          }
+        </div>
+
         <div class="quantity-card"><div><strong>How many doors are you outfitting?</strong><span>Exact quantity required before generating a quotation.</span></div><div class="quantity-control"><button type="button" (click)="decrementQuantity()"><mat-icon>remove</mat-icon></button><input type="number" min="1" [ngModel]="config.quantity" (ngModelChange)="set('quantity', $event)"><button type="button" (click)="incrementQuantity()"><mat-icon>add</mat-icon></button><span>door{{ quantity !== 1 ? 's' : '' }}</span></div></div>
 
         @if (selectedProduct) {
-          <div class="bom-card"><div class="bom-header"><mat-icon>receipt_long</mat-icon><strong>Auto-generated Bill of Materials</strong><span>× {{ quantity }}</span></div><div class="bom-list">@for (item of selectedProduct.bomAccessories; track item) { <div><span>{{ item }}</span><b>× {{ quantity }}</b></div> }</div><p>Final BOM reviewed by a Sales Engineer before order confirmation.</p></div>
+          <div class="bom-card"><div class="bom-header"><mat-icon>receipt_long</mat-icon><strong>Auto-generated Bill of Materials</strong><span>× {{ quantity }}</span></div><div class="bom-list">@for (item of selectedProduct.bomAccessories; track item) { <div><span>{{ item }}</span><b>× {{ quantity }}</b></div> } @for (item of accessMethodBomItems; track item) { <div><span>{{ item }}</span><b>× {{ quantity }}</b></div> }</div><p>Final BOM reviewed by a Sales Engineer before order confirmation.</p></div>
         }
 
         <div class="privacy-card"><mat-icon>shield</mat-icon><div><strong>Privacy & GDPR</strong><p>Your door configuration and any AR screenshots will be shared with our Sales team for quotation purposes only.</p><label class="check-row"><input type="checkbox" [checked]="config.gdprAccepted" (change)="set('gdprAccepted', $any($event.target).checked)"><span>I confirm this submission contains no personal data or identifiable images of individuals.</span></label></div></div>

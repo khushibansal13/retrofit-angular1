@@ -4,34 +4,69 @@ from PIL import Image
 from ollama import chat
 from schema import DoorProfile
 
-MODEL_NAME = "qwen2.5vl:3b"
+# Keep the model configurable, but default to 7b now that you've confirmed
+# it's genuinely better.
+MODEL_NAME = os.environ.get("ANALYZER_MODEL", "qwen2.5vl:7b")
 
+# Category wording below is copied verbatim from the customer-facing lock
+# picker (wizard.component.ts's lockTypeOptions) so the AI's classification
+# and the confirmation screen the customer sees say exactly the same thing.
 SALTO_VISION_PROMPT = """You are a senior access control surveyor for Salto Systems.
-Inspect the multi-angle photos of the door to derive technical retrofit parameters:
+Inspect the multi-angle photos of the door to derive technical retrofit parameters.
 
-CRITICAL HARDWARE FORM FACTOR IDENTIFICATION:
-1. Surface Rim Lock / Night Latch:
-   - A box-shaped lock mechanism mounted ON TOP of the door's interior surface (surface-mounted box), often operated by turning a knob or key, with round deadbolts throwing into an exterior frame bracket.
-     -> door_standard: "surface_rim_lock"
-     -> lock_type: "rim_cylinder"
-     -> cylinder_visible: true
-     -> deadbolt_present: true
+Classify the current lock into ONE of these six categories — use this exact
+language, it matches what the customer will be shown to confirm or correct:
 
-2. Cylindrical Knob / Tubular Latch:
-   - A spherical/round metal doorknob that has a keyhole integrated directly in its center, with the latch mechanism recessed inside the door edge.
-     -> door_standard: "cylindrical_knob_or_lever"
-     -> lock_type: "cylindrical_knob"
+1. Euro cylinder: A key cylinder sticks out slightly from a round hole in the door edge.
+   -> door_standard: "euro_profile"
+   -> lock_type: "euro_profile_cylinder"
+   -> cylinder_visible: true
 
-3. Euro Profile Cylinder:
-   - A separate teardrop-shaped key cylinder located below or above a lever handle.
+2. Deadbolt: A single throw-bolt lock, usually above the handle — common on US front doors.
+   -> door_standard: "US_deadbolt"
+   -> lock_type: "mechanical_deadbolt"
+   -> deadbolt_present: true
 
-4. Passage Latch (No Lock):
-   - Only a handle is present; no keyhole or cylinder anywhere.
-     -> door_standard: "passage_latch_euro"
-     -> lock_type: "no_lock_passage"
+3. Deadbolt + handle combo: A deadbolt and the handle/lever are linked together as one connected unit.
+   -> door_standard: "US_interconnected"
+   -> lock_type: "interconnected_deadbolt"
+   -> deadbolt_present: true
 
-5. US Deadbolt:
-   - A separate round/square deadbolt cylinder mounted 4-5.5 inches above a handle.
+4. Knob or lever: A round knob or lever handle with a keyhole underneath — no separate cylinder ring.
+   -> door_standard: "cylindrical_knob_or_lever"
+   -> lock_type: "cylindrical_knob"
+
+5. Surface-mounted box: A rectangular metal box mounted on the surface of the door (night latch style).
+   -> door_standard: "surface_rim_lock"
+   -> lock_type: "rim_cylinder"
+   -> cylinder_visible: true
+   -> deadbolt_present: true
+
+6. Just a latch, no lock: The door only has a spring latch — no separate locking cylinder or bolt.
+   -> door_standard: "passage_latch_euro"
+   -> lock_type: "no_lock_passage"
+
+If none of these six genuinely match what you see, do not force one — use
+door_standard "unknown" instead of guessing.
+
+DEADBOLT_PRESENT — READ CAREFULLY (this is commonly missed):
+deadbolt_present is NOT limited to category 2/3/5 above. Set it to true
+whenever you see ANY additional throw-bolt security hardware beyond the
+door's main handle/latch, including:
+  - a separate round or square deadbolt cylinder,
+  - a manual sliding bolt or barrel bolt (aldrop) mounted on the surface of
+    the door, operated by hand rather than a key,
+  - a separate keyhole-only plate mounted above or near the main lock, with
+    no handle attached to it.
+This is independent of the category above — for example, a door classified
+as category 4 (Knob or lever) that ALSO has a separate hand-operated slide
+bolt should still have deadbolt_present: true. Look at the full height of
+the door edge, not just the handle area, before deciding this is false.
+
+BRAND TEXT: if a brand name is clearly embossed or printed on the lock
+hardware and legible (e.g. stamped into a knob or faceplate), include it as
+plain text in visual_evidence (e.g. "Knob or lever, 'EUROPA' embossed on
+faceplate"). Do not guess a brand if it isn't clearly legible.
 """
 
 def optimize_image(img_path: str, max_dimension: int = 1024) -> str:

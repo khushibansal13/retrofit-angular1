@@ -1133,3 +1133,29 @@
     text-overflow: ellipsis;
   }
 }
+
+.ar-back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-right: 16px;
+}
+
+.ar-back-button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.ar-back-button mat-icon {
+  font-size: 17px;
+  width: 17px;
+  height: 17px;
+}

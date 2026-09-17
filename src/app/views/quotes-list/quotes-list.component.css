@@ -84,3 +84,47 @@
 .snackbar mat-icon{width:18px;height:18px;color:#81c784;font-size:18px}
 .snackbar span{flex:1}
 @media(max-width:480px){.quotes-header{padding-top:32px}.door-summary{gap:12px}.summary-item{min-width:58px}.action-row{padding:9px 12px}}
+.config-summary {
+  margin: 14px 0;
+}
+
+.config-summary-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #546e7a;
+  margin-bottom: 8px;
+}
+
+.config-summary-title mat-icon {
+  font-size: 15px;
+  width: 15px;
+  height: 15px;
+  color: #1565c0;
+}
+
+.config-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.config-chip {
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: #f1f4f8;
+  color: #37474f;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.config-chip.access {
+  background: #eaf3ff;
+  color: #1565c0;
+}
+
+.download-button {
+  color: #546e7a !important;
+}

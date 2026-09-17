@@ -18,6 +18,11 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { DoorConfig, Quotation } from '../../app';
 import { ALL_PRODUCTS, Product } from '../../data/products';
+import {
+  buildQuoteTextSummary,
+  getAccessMethodLabels,
+  getConfigSummaryChips,
+} from '../../data/config-summary';
 
 interface StatusMeta {
   label: string;
@@ -121,6 +126,17 @@ export class QuotesListComponent implements OnDestroy {
     );
   }
 
+  // Everything the customer told us across the whole wizard — business
+  // context, existing lock, backset/CtC, security preferences, hosting,
+  // etc. — not just the fit-relevant fields shown in the summary strip.
+  getConfigChips(q: Quotation): string[] {
+    return getConfigSummaryChips(q.config);
+  }
+
+  getAccessMethods(q: Quotation): string[] {
+    return getAccessMethodLabels(q.config);
+  }
+
   isExpanded(q: Quotation): boolean {
     return this.expandedId === q.id;
   }
@@ -131,6 +147,33 @@ export class QuotesListComponent implements OnDestroy {
 
   toggleBom(q: Quotation): void {
     this.expandedId = this.isExpanded(q) ? null : q.id;
+  }
+
+  // Plain-text export the customer or sales rep can save/email — no PDF
+  // library needed, a Blob download works in every browser.
+  downloadQuote(q: Quotation): void {
+    const product = this.getProduct(q);
+
+    const summary = buildQuoteTextSummary(
+      q.name,
+      q.createdAt,
+      this.getQuantity(q),
+      q.config,
+      product,
+    );
+
+    const blob = new Blob([summary], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${q.name.replace(/[^a-z0-9]+/gi, '-') || 'quote'}.txt`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
   }
 
   sendToSales(q: Quotation): void {

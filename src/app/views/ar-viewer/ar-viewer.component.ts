@@ -3,11 +3,13 @@ import {
   Component,
   CUSTOM_ELEMENTS_SCHEMA,
   ElementRef,
+  EventEmitter,
   HostListener,
   Input,
   OnChanges,
   OnDestroy,
   OnInit,
+  Output,
   SimpleChanges,
   ViewChild,
   inject,
@@ -29,6 +31,11 @@ import { DoorConfig } from '../../app';
 })
 export class ArViewerComponent implements OnInit, OnChanges, OnDestroy {
   @Input() config?: DoorConfig;
+
+  // Lets the Hub know the customer wants to leave AR and go back to editing
+  // their configuration, without losing any of it.
+  @Output() back = new EventEmitter<void>();
+
   private readonly arSession = inject(ArSessionService);
 
   @ViewChild('stage', { static: true })

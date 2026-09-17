@@ -5,11 +5,11 @@ export interface Product {
   tagline: string;
   badge?: string;
   category: 'door';
-  doorProfile: 'Wood' | 'Glass' | 'Both';
+  doorProfile: 'Wood' | 'Glass' | 'Metal' | 'Both';
   thicknessRange: string;
   thicknessMin: number;
   thicknessMax: number;
-  compatible: ('Wood' | 'Glass')[];
+  compatible: ('Wood' | 'Glass' | 'Metal')[];
   features: string[];
   finishes: string[];
   aiQuestions: string[];
@@ -33,7 +33,7 @@ export const ALL_PRODUCTS: Product[] = [
     thicknessRange: '30–120mm',
     thicknessMin: 30,
     thicknessMax: 120,
-    compatible: ['Wood'],
+    compatible: ['Wood', 'Metal'],
     features: [
       'Euro profile compatible',
       'Cylinder-based retrofit',
@@ -69,7 +69,7 @@ export const ALL_PRODUCTS: Product[] = [
     thicknessRange: '30–120mm',
     thicknessMin: 30,
     thicknessMax: 120,
-    compatible: ['Wood'],
+    compatible: ['Wood', 'Metal'],
     features: [
       'Euro profile compatible',
       'High-traffic electronic lock',
@@ -106,7 +106,7 @@ export const ALL_PRODUCTS: Product[] = [
     thicknessRange: '35–85mm',
     thicknessMin: 35,
     thicknessMax: 85,
-    compatible: ['Wood'],
+    compatible: ['Wood', 'Metal'],
     features: [
       'US deadbolt compatible',
       'Touch access',
@@ -142,7 +142,7 @@ export const ALL_PRODUCTS: Product[] = [
     thicknessRange: '40–85mm',
     thicknessMin: 40,
     thicknessMax: 85,
-    compatible: ['Wood'],
+    compatible: ['Wood', 'Metal'],
     features: [
       'US interconnected lock compatible',
       'Touch access',
@@ -178,7 +178,7 @@ export const ALL_PRODUCTS: Product[] = [
     thicknessRange: '30–120mm',
     thicknessMin: 30,
     thicknessMax: 120,
-    compatible: ['Wood'],
+    compatible: ['Wood', 'Metal'],
     features: [
       'ANSI compatible',
       'Cylindrical preparation compatible',
@@ -204,7 +204,7 @@ export const ALL_PRODUCTS: Product[] = [
   },
 ];
 
-export const COMMON_BOM: Record<'Wood' | 'Glass', string[]> = {
+export const COMMON_BOM: Record<'Wood' | 'Glass' | 'Metal', string[]> = {
   Wood: [
     'Lock Escutcheon (pair)',
     'Handle Set',
@@ -218,6 +218,13 @@ export const COMMON_BOM: Record<'Wood' | 'Glass', string[]> = {
     'Clamp Hardware (pair)',
     'Cylinder Knobs (pair)',
     'AA Batteries × 4',
+  ],
+  Metal: [
+    'Reinforced Mounting Plate',
+    'Lock Escutcheon (pair)',
+    'Handle Set',
+    'AA Batteries × 4',
+    'Strike Plate',
   ],
 };
 

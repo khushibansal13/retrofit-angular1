@@ -28,10 +28,14 @@ export class SwitchLockComponent {
   @Output() viewInAR = new EventEmitter<void>();
   @Output() restartWizard = new EventEmitter<void>();
 
+  // New: a non-destructive "go back and edit" path, separate from
+  // restartWizard (which wipes the whole configuration).
+  @Output() editConfiguration = new EventEmitter<void>();
+
   readonly finishColors = FINISH_COLORS;
 
-  get material(): 'Wood' | 'Glass' | '' {
-    return this.config.material as 'Wood' | 'Glass' | '';
+  get material(): 'Wood' | 'Glass' | 'Metal' | '' {
+    return this.config.material as 'Wood' | 'Glass' | 'Metal' | '';
   }
 
   get selectedProduct(): Product | null {
@@ -42,15 +46,35 @@ export class SwitchLockComponent {
     return ALL_PRODUCTS.find(product => product.id === this.config.product) ?? null;
   }
 
-  get recommended(): Product[] {
-    return ALL_PRODUCTS.filter(product =>
-      this.material === '' ||
-      product.compatible.includes(this.material)
+  // This is a catalog, not a recommendation engine — Switch Lock only has
+  // material + thickness to go on (it never sees the actual compatibility
+  // engine's door_standard-based verdict), so the badge is deliberately
+  // scoped to "fits your door's material and thickness", not a blanket
+  // "compatible" claim.
+  isBestMatch(product: Product): boolean {
+    if (!this.material) {
+      return false;
+    }
+
+    const thickness = Number(this.config.thickness);
+
+    if (!Number.isFinite(thickness) || thickness <= 0) {
+      return false;
+    }
+
+    return (
+      product.compatible.includes(this.material) &&
+      thickness >= product.thicknessMin &&
+      thickness <= product.thicknessMax
     );
   }
 
-  get others(): Product[] {
-    return ALL_PRODUCTS.filter(product => !this.recommended.includes(product));
+  get sortedProducts(): Product[] {
+    return [...ALL_PRODUCTS].sort((a, b) => {
+      const aScore = this.isBestMatch(a) ? 0 : 1;
+      const bScore = this.isBestMatch(b) ? 0 : 1;
+      return aScore - bScore;
+    });
   }
 
   isSelected(product: Product): boolean {

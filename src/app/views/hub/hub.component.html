@@ -1,7 +1,10 @@
 <div class="hub">
   <div class="hub-content">
     @if (tab === 0) {
-      <app-ar-viewer [config]="config"></app-ar-viewer>
+      <app-ar-viewer
+        [config]="config"
+        (back)="onExitAr()"
+      ></app-ar-viewer>
     }
 
     @if (tab === 1) {
@@ -19,6 +22,7 @@
         (configChange)="onConfigChange($event)"
         (viewInAR)="goToAR()"
         (restartWizard)="onRestartWizard()"
+        (editConfiguration)="onEditConfiguration()"
       />
     }
 
