@@ -1,0 +1,63 @@
+﻿services:
+
+  angular:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: retrofit-angular
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: retrofit-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      # Keep the model resident between requests
+      - OLLAMA_KEEP_ALIVE=30m
+
+      # Uncomment if required for your setup
+      # - OLLAMA_FLASH_ATTENTION=1
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    # Uncomment if this machine has an NVIDIA GPU
+    # and NVIDIA Container Toolkit installed.
+    #
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  model-puller:
+    image: curlimages/curl:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+      for m in qwen2.5vl:3b moondream llava-phi3 gemma3:4b; do
+        echo \"Pulling $$m...\";
+        curl -s http://ollama:11434/api/pull -d \"{\\\"name\\\":\\\"$$m\\\"}\";
+        echo;
+      done
+      "
+    profiles:
+      - tools
+
+volumes:
+  ollama_data:
