@@ -144,10 +144,10 @@ export interface CheckCompatibilityRequest {
 export class DoorVisionService {
 
   private get apiUrl(): string {
-    if (typeof window !== 'undefined') {
-      return '/api';
-    }
-    return 'http://127.0.0.1:8000/api';
+    // if (typeof window !== 'undefined') {
+    //   return '/api';
+    // }
+    return 'https://retrofit-angular1-production.up.railway.app/api';
   }
 
 
