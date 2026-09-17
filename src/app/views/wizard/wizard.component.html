@@ -65,7 +65,7 @@
 
         <div class="biz-carousel">
           <div class="biz-track" [style.transform]="'translateX(' + (-bizStep * 100) + '%)'">
-            <div class="biz-slide">
+            <div class="biz-slide" [class.is-active]="bizStep === 0">
               <div class="environment-grid compact">
                 @for (domain of businessDomains; track domain.id) {
                   <button type="button" class="environment-card" [class.selected]="config.environment === domain.id" (click)="selectBusinessDomain(domain.id)">
@@ -77,7 +77,7 @@
               </div>
             </div>
 
-            <div class="biz-slide">
+            <div class="biz-slide" [class.is-active]="bizStep === 1">
               <div class="budget-grid">
                 @for (budget of budgetOptions; track budget.id) {
                   <button type="button" class="budget-card" [class.selected]="config.budget === budget.id" (click)="selectBudget(budget.id)">
@@ -90,7 +90,7 @@
               <button type="button" class="text-button" (click)="goToBizStep(0)"><mat-icon>arrow_back</mat-icon> Back to business type</button>
             </div>
 
-            <div class="biz-slide">
+            <div class="biz-slide" [class.is-active]="bizStep === 2">
               <div class="field-section-title">How often will this door be used?</div>
               <p class="field-help">This helps us flag doors that need a higher-capacity battery.</p>
               <div class="choice-pill-row">
