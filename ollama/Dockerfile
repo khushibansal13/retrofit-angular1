@@ -1,5 +1,9 @@
 FROM ollama/ollama:latest
 
+COPY start.sh /start.sh
+
+RUN chmod +x /start.sh
+
 EXPOSE 11434
 
-CMD ["sh", "-c", "ollama serve & sleep 5 && ollama pull qwen2.5vl:3b && wait"]
+ENTRYPOINT ["/start.sh"]
