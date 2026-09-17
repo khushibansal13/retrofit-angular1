@@ -11,8 +11,8 @@ engine = SaltoCompatibilityEngine()
 
 # --- STEP 1: UPLOAD & ANALYSIS ---
 uploaded_files = st.file_uploader(
-    "Upload 1 to 5 photos of the door (Wide view, Lock close-up, Door edge)", 
-    type=["jpg", "jpeg", "png"], 
+    "Upload 2 to 3 photos of the door (Wide view, Lock close-up, Door edge)",
+    type=["jpg", "jpeg", "png"],
     accept_multiple_files=True
 )
 
@@ -45,9 +45,9 @@ if uploaded_files:
 if "door_profile" in st.session_state:
     profile = st.session_state["door_profile"]
     st.divider()
-    
+
     col_left, col_right = st.columns([1, 1.2])
-    
+
     with col_left:
         st.subheader("📋 Detected Door Profile")
         st.write(f"**Standard:** `{profile.door_standard.value}` (Conf: {profile.door_standard_confidence})")
@@ -56,7 +56,7 @@ if "door_profile" in st.session_state:
         st.write(f"**Handing:** `{profile.handing.value}`")
         st.write(f"**Material:** `{profile.door_material}`")
         st.write(f"**Visual Evidence:** {profile.lock.visual_evidence}")
-        
+
         st.subheader("📏 Confirm Measurements")
         st.info("Exact millimeters cannot be guessed by 2D camera. Please verify:")
         thickness = st.slider("Door Thickness (mm)", min_value=25, max_value=100, value=45)
@@ -93,12 +93,12 @@ if "door_profile" in st.session_state:
     # --- STEP 3: CONFIGURATION & BOM GENERATION ---
     st.divider()
     st.subheader("🛠️ Step 3: Product Configuration & Bill of Materials (BOM)")
-    
+
     if compatible_products:
         prod_options = {p["name"]: p for p in compatible_products}
         selected_prod_name = st.selectbox("Select Compatible Product to Configure:", list(prod_options.keys()))
         selected_prod = prod_options[selected_prod_name]
-        
+
         cfg_col1, cfg_col2, cfg_col3 = st.columns(3)
         with cfg_col1:
             finish = st.selectbox("Hardware Finish", ["Matte Black", "Satin Chrome", "Polished Brass", "White"])
@@ -114,12 +114,12 @@ if "door_profile" in st.session_state:
             {"item": f"Finish Cover Plate ({finish})", "sku": f"COV-{finish.replace(' ', '').upper()}", "qty": 1, "type": "Aesthetic"},
             {"item": f"Salto System Licensing ({platform})", "sku": "LIC-HOMELOK-RES", "qty": 1, "type": "Software"}
         ]
-        
+
         if "RFID Keyfob" in wireless:
             bom.append({"item": "Contactless MIFARE DESFire EV3 Keyfob", "sku": "SALTO-FOB-EV3", "qty": 2, "type": "Access Media"})
 
         st.table(bom)
-        
+
         # Customer / Sales Handover Export
         quote_payload = {
             "door_profile": profile.model_dump(),
@@ -132,7 +132,7 @@ if "door_profile" in st.session_state:
             },
             "bom": bom
         }
-        
+
         st.download_button(
             label="📥 Download Lead Quote & Handover JSON",
             data=json.dumps(quote_payload, indent=2),

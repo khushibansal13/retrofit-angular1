@@ -21,6 +21,12 @@ export interface DoorConfig {
   quantity: string;
   fitStatus: 'fit' | 'no-fit' | '';
   orderStatus: 'draft' | 'submitted' | 'approved' | 'delivered' | 'installed' | '';
+
+  // Kept: DoorProfile still supports measured_backset_mm/measured_center_to_center_mm.
+  // Dropped countryCode/faceplate/leverStyle/hingeType — the simplified DoorProfile
+  // has nowhere to put them.
+  backsetMm: string;
+  centerToCenterMm: string;
 }
 
 export interface Quotation {
@@ -49,6 +55,9 @@ export const EMPTY_CONFIG: DoorConfig = {
   quantity: '1',
   fitStatus: '',
   orderStatus: '',
+
+  backsetMm: '',
+  centerToCenterMm: '',
 };
 
 @Component({
@@ -102,8 +111,6 @@ export class App {
   }
 
   editConfiguration(): void {
-    // Deliberately do NOT reset config. The Wizard will reopen at the
-    // furthest meaningful step with the existing configuration intact.
     this.phase.set('wizard');
   }
 }

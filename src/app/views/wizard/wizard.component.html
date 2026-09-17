@@ -62,7 +62,7 @@
 
         <div class="ai-note">
           <mat-icon>auto_awesome</mat-icon>
-          <div><strong>AI will detect</strong> door material, style, existing lock type, and frame details automatically from your photo in the next step.</div>
+          <div><strong>AI will detect</strong> door material, style, existing lock type, handing, and frame details automatically from your photo in the next step.</div>
         </div>
 
         <button type="button" class="primary-button full" [disabled]="!config.environment" (click)="continueFromEnvironment()">Continue <mat-icon>arrow_forward</mat-icon></button>
@@ -162,7 +162,9 @@
             <div class="detected-card"><mat-icon>door_front</mat-icon><div><strong>{{ detectedProfile?.doorStyle }}</strong><span>Door style · {{ detectedProfile?.styleConf }}% confidence</span></div></div>
             <div class="detected-card"><mat-icon>lock</mat-icon><div><strong>{{ detectedProfile?.existingLock }}</strong><span>Existing lock · {{ detectedProfile?.lockConf }}% confidence</span></div></div>
             <div class="detected-card"><mat-icon>crop_free</mat-icon><div><strong>Frame detected</strong><span>Frame profile · {{ detectedProfile?.frameConf }}% confidence</span></div></div>
+            <div class="detected-card"><mat-icon>compare_arrows</mat-icon><div><strong>{{ detectedProfile?.handing }}</strong><span>Handing · {{ detectedProfile?.handingConf }}% confidence</span></div></div>
           </div>
+          <p class="field-help">Low-confidence or "Unknown" readings are normal from a single photo — confirm or correct them on the next screen.</p>
           <div class="detected-actions"><button type="button" class="secondary-button" (click)="openManual()">Edit details</button><button type="button" class="primary-button" (click)="useDetectedDetails()">Continue <mat-icon>arrow_forward</mat-icon></button></div>
         }
 
@@ -206,6 +208,29 @@
             <div><div class="option-label">LEAF COUNT</div><div class="pill-row">@for (leaf of leafCounts; track leaf) { <button type="button" [class.active]="config.leafCount === leaf" (click)="set('leafCount', leaf)">{{ leaf }}</button> }</div></div>
           </div>
 
+          <div class="section-divider"></div>
+
+          <button type="button" class="advanced-toggle" (click)="toggleAdvancedDetails()">
+            <mat-icon>{{ showAdvancedDetails ? 'expand_less' : 'tune' }}</mat-icon>
+            {{ showAdvancedDetails ? 'Hide advanced installer details' : 'Add advanced installer details (optional)' }}
+          </button>
+          <p class="field-help">Backset and center-to-center spacing sharpen the compatibility check further — skip these if you don't have them.</p>
+
+          @if (showAdvancedDetails) {
+            <div class="advanced-grid">
+              <label class="input-field">
+                <span>Backset</span>
+                <div><input type="number" [(ngModel)]="config.backsetMm" (ngModelChange)="set('backsetMm', $event)"><em>mm</em></div>
+                <small>Typically 60 or 70mm</small>
+              </label>
+              <label class="input-field">
+                <span>Center-to-center</span>
+                <div><input type="number" [(ngModel)]="config.centerToCenterMm" (ngModelChange)="set('centerToCenterMm', $event)"><em>mm</em></div>
+                <small>Interconnected deadbolts only</small>
+              </label>
+            </div>
+          }
+
           <button type="button" class="primary-button full" [disabled]="!config.material || !config.width || !config.height || !config.thickness" (click)="continueFromDetails()">Continue to smart locks <mat-icon>arrow_forward</mat-icon></button>
         }
       </section>
@@ -235,8 +260,6 @@
             Showing SALTO products for your configured door.
           }
         </p>
-
-        <!-- COMPATIBLE PRODUCTS -->
 
         @if (compatibleRecommendations.length) {
           <div class="compatibility-heading">
@@ -300,9 +323,11 @@
                       <div class="recommendation-reason">
                         <mat-icon>verified</mat-icon>
 
-                        <span>
-                      {{ recommendation.reasons[0] }}
-                    </span>
+                        <div class="reason-list">
+                          @for (reason of recommendation.reasons; track reason) {
+                            <span>{{ reason }}</span>
+                          }
+                        </div>
                       </div>
                     }
 
@@ -361,8 +386,6 @@
             }
           </div>
         }
-
-        <!-- NEEDS MORE INFORMATION -->
 
         @if (
           missingInformationRecommendations.length
@@ -507,8 +530,6 @@
           </div>
         }
 
-        <!-- INCOMPATIBLE PRODUCTS -->
-
         @if (
           incompatibleRecommendations.length
           ) {
@@ -608,8 +629,6 @@
           </div>
         }
 
-        <!-- No scan result -->
-
         @if (!analysisResult) {
           <div class="scan-info">
             <mat-icon>info</mat-icon>
@@ -646,7 +665,21 @@
 
         @if (selectedProduct) {
           <div class="fit-alert" [class.success]="fit" [class.error]="!fit"><mat-icon>{{ fit ? 'check_circle' : 'error' }}</mat-icon><div><strong>{{ fit ? 'Fit Confirmed ✓' : 'Fit Issue ✗' }}</strong><span>{{ selectedProduct.name }} supports {{ selectedProduct.thicknessRange }} and your door is {{ config.thickness }}mm.</span></div></div>
-          <div class="selected-lock-card"><img [src]="selectedProduct.imageUrl" [alt]="selectedProduct.name"><div><small>SELECTED LOCK</small><h2>{{ selectedProduct.name }}</h2><p>Finish: {{ config.finish }} · Thickness: {{ config.thickness }}mm</p><p>{{ config.material }} door · {{ config.environment }}</p></div></div>
+          <div class="selected-lock-card">
+            <img [src]="selectedProduct.imageUrl" [alt]="selectedProduct.name">
+            <div>
+              <small>SELECTED LOCK</small>
+              <h2>{{ selectedProduct.name }}</h2>
+              <p>Finish: {{ config.finish }} · Thickness: {{ config.thickness }}mm</p>
+              <p>{{ config.material }} door · {{ config.environment }} · {{ config.direction }}</p>
+              @if (config.backsetMm || config.centerToCenterMm) {
+                <div class="bom-extra-specs">
+                  @if (config.backsetMm) { <span>Backset {{ config.backsetMm }}mm</span> }
+                  @if (config.centerToCenterMm) { <span>Center-to-center {{ config.centerToCenterMm }}mm</span> }
+                </div>
+              }
+            </div>
+          </div>
         }
 
         <div class="quantity-card"><div><strong>How many doors are you outfitting?</strong><span>Exact quantity required before generating a quotation.</span></div><div class="quantity-control"><button type="button" (click)="decrementQuantity()"><mat-icon>remove</mat-icon></button><input type="number" min="1" [ngModel]="config.quantity" (ngModelChange)="set('quantity', $event)"><button type="button" (click)="incrementQuantity()"><mat-icon>add</mat-icon></button><span>door{{ quantity !== 1 ? 's' : '' }}</span></div></div>

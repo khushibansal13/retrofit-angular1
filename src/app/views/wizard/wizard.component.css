@@ -58,3 +58,105 @@
 .scan-file-summary small {
   color: #64748b;
 }
+
+/* Advanced installer details (backset, center-to-center, faceplate,
+   lever style, hinge type, country) — collapsed by default so casual
+   customers aren't shown fields they don't have. */
+.advanced-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #d7dce5;
+  background: #fff;
+  color: #1565c0;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 10px 14px;
+  border-radius: 11px;
+  cursor: pointer;
+}
+
+.advanced-toggle mat-icon {
+  font-size: 17px;
+  width: 17px;
+  height: 17px;
+}
+
+.advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 14px 0 6px;
+}
+
+.advanced-grid .input-field select {
+  border: 0;
+  outline: 0;
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  background: transparent;
+  color: inherit;
+}
+
+@media (max-width: 700px) {
+  .advanced-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 430px) {
+  .advanced-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Multiple compatibility reasons/cautions per product (engine.py can now
+   return more than one reason per product, including soft cautions). */
+.recommendation-reason {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: #f1faf5;
+  margin-bottom: 10px;
+}
+
+.recommendation-reason mat-icon {
+  color: #17825a;
+  font-size: 15px;
+  width: 15px;
+  height: 15px;
+  margin-top: 1px;
+}
+
+.recommendation-reason .reason-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.recommendation-reason .reason-list span {
+  font-size: 10px;
+  color: #29543f;
+  line-height: 1.5;
+}
+
+/* Confirmed extras shown on the final review/quote screen */
+.bom-extra-specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.bom-extra-specs span {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 7px;
+  background: #eef3f8;
+  color: #52606f;
+}

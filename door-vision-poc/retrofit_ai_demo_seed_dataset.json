@@ -1,75 +1,73 @@
 {
-  "schema_version": "0.1-demo",
-  "purpose": "Retrofit AI hackathon MVP: shared product intelligence + compatibility + role-based workflows",
+  "schema_version": "0.2-dev",
+  "purpose": "Retrofit AI: shared product intelligence + compatibility + role-based workflows",
   "principle": "Vision AI extracts observations; deterministic rules decide technical compatibility.",
+  "country_standard_map_note": "Reference only — not yet consumed by the engine. Intended for the UI to pre-suggest a door_standard hint once a customer picks a country, and for the ingestion pipeline to sanity-check extracted specs. This is about which DOOR PREPARATION STANDARD is conventional in a country, NOT which countries SALTO holds regulatory certification in (that's a much broader list — see each product's 'certifications' field, sourced from real datasheets). Verify before relying on it.",
+  "country_standard_map": {
+    "US": "US_deadbolt_or_US_interconnected_or_ANSI",
+    "CA": "US_deadbolt_or_US_interconnected_or_ANSI",
+    "GB": "euro_profile",
+    "DE": "euro_profile",
+    "FR": "euro_profile",
+    "ES": "euro_profile",
+    "IT": "euro_profile",
+    "NL": "euro_profile",
+    "BE": "euro_profile",
+    "IN": "euro_profile",
+    "AU": "ANSI",
+    "AE": "euro_profile"
+  },
   "products": [
     {
       "product_id": "salto_dlok_euro",
       "name": "SALTO DLok Euro",
       "family": "DLok",
-      "market": [
-        "residential"
-      ],
-      "door_standard": [
-        "euro_profile_cylinder"
-      ],
+      "market": ["residential"],
+      "door_standard": ["euro_profile_cylinder"],
       "retrofit": true,
       "outside_appearance": "invisible_from_outside",
-      "application": [
-        "apartment",
-        "residential"
-      ],
+      "application": ["apartment", "residential"],
       "door_thickness_mm": null,
       "technical_specs": {
         "dimensions_mm": "60 x 61",
         "weight_g": 230,
         "power": "4 x CR123A lithium batteries",
-        "materials": [
-          "anodised aluminum",
-          "ABS plastic"
-        ],
+        "materials": ["anodised aluminum", "ABS plastic"],
         "operating_temperature_c": "0 to +50",
         "humidity_percent": "0-90 non-condensing"
       },
-      "technology_platforms": [
-        "Salto Homelok"
-      ],
-      "wireless": [
-        "Bluetooth LE"
-      ],
-      "compatibility_inputs_required": [
-        "euro_profile_cylinder_present",
-        "cylinder_geometry",
-        "application_residential"
-      ],
-      "source_documents": [
-        "DLokEuro_Datasheet_en.pdf",
-        "dlok_1_290_11_258_275.pdf"
-      ],
+      "technology_platforms": ["Salto Homelok"],
+      "wireless": ["Bluetooth LE"],
+      "compatibility_inputs_required": ["door_standard", "lock_type"],
+      "compatibility_rules": {
+        "door_standard": {
+          "any_of": ["euro_profile", "passage_latch_euro"],
+          "on_fail": "incompatible",
+          "fail_message": "Incompatible: DLok Euro requires a DIN Euro profile door preparation."
+        },
+        "lock_type": {
+          "any_of": ["euro_profile_cylinder"],
+          "on_fail": "missing_information",
+          "fail_message": "Passage latch detected (no cylinder found). Requires a Euro-profile mortise cassette installed before DLok can be fitted.",
+          "pass_message": "Euro profile cylinder detected. Direct cylinder retrofit supported."
+        }
+      },
+      "market_countries": ["GB", "DE", "FR", "ES", "IT", "NL", "BE", "IN", "AE"],
+      "needs_review": true,
+      "review_note": "No public datasheet with hard numbers was found this session — dimensions/battery/materials are carried over from the original seed data, unverified against a live SALTO source.",
+      "source_documents": ["DLokEuro_Datasheet_en.pdf", "dlok_1_290_11_258_275.pdf"],
       "image_url": "/locks/salto_dlok_euro.png"
     },
     {
       "product_id": "salto_dbolt_touch",
       "name": "SALTO DBolt Touch",
       "family": "DBolt Touch",
-      "market": [
-        "residential"
-      ],
+      "market": ["residential"],
       "retrofit": true,
-      "door_standard": [
-        "US_deadbolt"
-      ],
-      "lock_type": [
-        "mechanical_deadbolt"
-      ],
-      "door_thickness_mm": {
-        "min": 35,
-        "max": 85
-      },
-      "backset_mm": [
-        60,
-        70
-      ],
+      "door_standard": ["US_deadbolt"],
+      "lock_type": ["mechanical_deadbolt"],
+      "door_thickness_mm": { "min": 35, "max": 85 },
+      "backset_mm": [60, 70],
       "face_plates": [
         "28.5 mm square corner",
         "25.4 mm square corner",
@@ -81,117 +79,147 @@
         "power": "3 AA batteries (LR6 1.5V)",
         "certification": "AAA according to ANSI/BHMA A156.40"
       },
-      "technology_platforms": [
-        "Salto Space",
-        "Salto KS",
-        "Salto Homelok"
-      ],
-      "wireless": [
-        "Bluetooth LE",
-        "NFC"
-      ],
-      "compatibility_inputs_required": [
-        "US_deadbolt_present",
-        "door_thickness_mm",
-        "backset_mm",
-        "faceplate_geometry"
-      ],
-      "source_documents": [
-        "DBoltTouch_Datasheet_en.pdf"
-      ],
+      "certifications": ["CE", "FCC", "IP55 (outside only)", "IC", "UKCA", "TDRA", "UL Listed", "BHMA A156.40"],
+      "technology_platforms": ["Salto Space", "Salto KS", "Salto Homelok"],
+      "wireless": ["Bluetooth LE", "NFC"],
+      "compatibility_inputs_required": ["door_standard", "thickness_mm", "backset_mm"],
+      "compatibility_rules": {
+        "door_standard": {
+          "any_of": ["US_deadbolt"],
+          "on_fail": "incompatible",
+          "fail_message": "Requires US Deadbolt standard door preparation."
+        },
+        "thickness_mm": {
+          "min": 35,
+          "max": 85,
+          "on_fail": "incompatible",
+          "fail_message": "Door thickness is outside the 35-85mm supported range.",
+          "pass_message": "Door thickness within the 35-85mm supported range."
+        },
+        "backset_mm": {
+          "any_of": [60, 70],
+          "tolerance": 1,
+          "on_fail": "incompatible",
+          "fail_message": "Backset doesn't match the 60mm or 70mm options; the existing bore holes won't align.",
+          "pass_message": "Backset matches a supported 60/70mm option."
+        },
+        "faceplate_mm": {
+          "any_of": [
+            "28.5 mm square corner",
+            "25.4 mm square corner",
+            "25.4 mm + R6.4 mm radius round corner"
+          ],
+          "on_fail": "caution",
+          "fail_message": "Faceplate shape doesn't match a listed option — confirm with an installer photo before ordering a cover plate."
+        }
+      },
+      "market_countries": ["US", "CA"],
+      "needs_review": false,
+      "review_note": "Verified against DBoltTouch_Datasheet_en.pdf in models/dbolt-touch-deadbolt/datasheets/.",
+      "source_documents": ["DBoltTouch_Datasheet_en.pdf"],
       "image_url": "/locks/salto_dbolt_touch.png"
     },
     {
       "product_id": "salto_dbolt_touch_ic",
       "name": "SALTO DBolt Touch Interconnected",
       "family": "DBolt Touch",
-      "market": [
-        "residential",
-        "multi_family"
-      ],
+      "market": ["residential", "multi_family"],
       "retrofit": true,
-      "door_standard": [
-        "US_interconnected_deadbolt"
-      ],
-      "lock_type": [
-        "interconnected_deadbolt"
-      ],
-      "door_thickness_mm": {
-        "min": 40,
-        "max": 85
-      },
-      "center_to_center_fitting_in": [
-        "4",
-        "5.5"
-      ],
-      "backset_mm": [
-        60,
-        70
-      ],
-      "levers": [
-        "N",
-        "A",
-        "G",
-        "K",
-        "O"
-      ],
+      "door_standard": ["US_interconnected_deadbolt"],
+      "lock_type": ["interconnected_deadbolt"],
+      "door_thickness_mm": { "min": 40, "max": 85 },
+      "center_to_center_fitting_in": ["4", "5.5"],
+      "backset_mm": [60, 70],
+      "levers": ["N", "A", "G", "K", "O"],
       "technical_specs": {
         "outside_housing_mm": "160 x 68 x 46",
         "inside_housing_mm": "300 x 77.5 x 63",
         "power": "3 AA batteries (LR6 1.5V)",
         "certification": "Grade 2 according to ANSI/BHMA A156.12"
       },
-      "technology_platforms": [
-        "Salto Space",
-        "Salto KS"
-      ],
-      "wireless": [
-        "Bluetooth LE",
-        "NFC"
-      ],
+      "technology_platforms": ["Salto Space", "Salto KS"],
+      "wireless": ["Bluetooth LE", "NFC"],
       "compatibility_inputs_required": [
-        "interconnected_deadbolt_present",
-        "door_thickness_mm",
-        "center_to_center_fitting",
+        "door_standard",
+        "thickness_mm",
         "backset_mm",
-        "lever_configuration"
+        "center_to_center_mm"
       ],
-      "source_documents": [
-        "DBolt Touch Interconnected | Tech. Specs"
-      ],
+      "compatibility_rules": {
+        "door_standard": {
+          "any_of": ["US_interconnected"],
+          "on_fail": "incompatible",
+          "fail_message": "Requires US Interconnected deadbolt standard door preparation."
+        },
+        "thickness_mm": {
+          "min": 40,
+          "max": 85,
+          "on_fail": "incompatible",
+          "fail_message": "Door thickness is outside the 40-85mm supported range.",
+          "pass_message": "Door thickness within the 40-85mm supported range."
+        },
+        "backset_mm": {
+          "any_of": [60, 70],
+          "tolerance": 1,
+          "on_fail": "incompatible",
+          "fail_message": "Backset doesn't match the 60mm or 70mm options; the existing bore holes won't align."
+        },
+        "center_to_center_mm": {
+          "any_of": [101.6, 139.7],
+          "tolerance": 2,
+          "on_fail": "incompatible",
+          "fail_message": "Center-to-center spacing doesn't match the supported 4in (101.6mm) or 5.5in (139.7mm) fitting.",
+          "pass_message": "Center-to-center spacing matches a supported fitting."
+        },
+        "lever_style": {
+          "any_of": ["N", "A", "G", "K", "O"],
+          "on_fail": "caution",
+          "fail_message": "Lever style code not recognized among supported options (N/A/G/K/O) — confirm with installer."
+        }
+      },
+      "market_countries": ["US", "CA"],
+      "needs_review": false,
+      "review_note": "Backset and cylindrical-prep spacing confirmed via SALTO's own product page text; full datasheet PDF was not available locally.",
+      "source_documents": ["DBolt Touch Interconnected | Tech. Specs"],
       "image_url": "/locks/salto_dbolt_touch_ic.png"
     },
     {
       "product_id": "salto_xs4_original_plus_ansi",
       "name": "SALTO XS4 Original+ ANSI",
       "family": "XS4 Original+",
-      "market": [
-        "commercial",
-        "residential"
-      ],
-      "door_standard": [
-        "ANSI"
-      ],
-      "lock_type": [
-        "mortise",
-        "cylindrical",
-        "tubular_latch"
-      ],
+      "market": ["commercial", "residential"],
+      "door_standard": ["ANSI"],
+      "lock_type": ["mortise", "cylindrical", "tubular_latch"],
       "retrofit": true,
-      "compatibility_inputs_required": [
-        "ANSI_profile",
-        "lock_type",
-        "door_thickness_mm",
-        "handing",
-        "required_mortise_or_latch_configuration"
-      ],
-      "technology_platforms": [
-        "BLUEnet"
-      ],
-      "wireless": [
-        "Bluetooth LE",
-        "NFC"
-      ],
+      "door_thickness_mm": { "min": 32, "max": 120 },
+      "technical_specs": {
+        "dimensions_mm": "290 x 67 x 20",
+        "handle_rotation_degrees": 52,
+        "override_mortise_cylinder_length_in": "1-1/8",
+        "square_spindles_mm": ["8", "7 diamond", "8 split", "7 diamond split", "7.6"],
+        "reversible_handle": true
+      },
+      "certifications": ["CE", "FCC", "IP55", "EAC", "IC", "UKCA", "IMDA", "TDRA", "CRA", "NBTC", "CQ ICT"],
+      "compatibility_inputs_required": ["door_standard", "thickness_mm"],
+      "compatibility_rules": {
+        "door_standard": {
+          "any_of": ["ANSI", "cylindrical_knob_or_lever", "US_deadbolt"],
+          "on_fail": "incompatible",
+          "fail_message": "Requires an ANSI/cylindrical door preparation."
+        },
+        "thickness_mm": {
+          "min": 32,
+          "max": 120,
+          "on_fail": "incompatible",
+          "fail_message": "Door thickness is outside the 32-120mm supported range.",
+          "pass_message": "Compatible with ANSI/cylindrical door preparation."
+        }
+      },
+      "technology_platforms": ["BLUEnet"],
+      "wireless": ["Bluetooth LE", "NFC"],
+      "market_countries": ["US", "CA", "AU", "IN"],
+      "needs_review": false,
+      "review_note": "Verified against XS4Original+ANSI_Datasheet_en.pdf in models/xs4-original-plus-ansi/datasheets/. Corrected thickness min from an earlier guess of 30mm to the real 32mm. Handing is NOT a hard rule — datasheet confirms the escutcheon is reversible left/right.",
       "source_documents": [
         "XS4Original+ANSI_Datasheet_en.pdf",
         "inst_guide_xs4_original_plus_ai6xx_226844_1.pdf"
@@ -202,32 +230,50 @@
       "product_id": "salto_xs4_original_plus_euro",
       "name": "SALTO XS4 Original+ EURO",
       "family": "XS4 Original+",
-      "market": [
-        "commercial",
-        "residential"
-      ],
-      "door_standard": [
-        "European profile",
-        "EURO"
-      ],
-      "lock_type": [
-        "mortise",
-        "tubular_latch"
-      ],
+      "market": ["commercial", "residential"],
+      "door_standard": ["European profile", "EURO"],
+      "lock_type": ["mortise", "tubular_latch"],
       "retrofit": true,
-      "compatibility_inputs_required": [
-        "European_profile",
-        "lock_type",
-        "door_thickness_mm",
-        "handing"
-      ],
-      "technology_platforms": [
-        "BLUEnet"
-      ],
-      "wireless": [
-        "Bluetooth LE",
-        "NFC"
-      ],
+      "door_thickness_mm": { "min": 32, "max": 120 },
+      "technical_specs": {
+        "dimensions_mm": "282 x 40 x 20",
+        "handle_rotation_degrees": 33,
+        "handle_to_cylinder_distance_mm": { "min": 47, "max": 110 },
+        "square_spindles_mm": ["7", "7.6 split (AU)", "8", "8 split (Euro & ANSI)", "9", "9 split"],
+        "reversible_handle": true,
+        "also_compatible_with": [
+          "Swiss profile cylinder mortise locks",
+          "Australian standard mortise locks",
+          "narrow style mortise lock"
+        ]
+      },
+      "certifications": ["CE", "FCC", "IP55", "EAC", "IC", "UKCA", "IMDA", "TDRA", "CRA", "NBTC", "CQ ICT", "WPC", "NOM"],
+      "compatibility_inputs_required": ["door_standard", "thickness_mm"],
+      "compatibility_rules": {
+        "door_standard": {
+          "any_of": ["euro_profile", "passage_latch_euro"],
+          "on_fail": "incompatible",
+          "fail_message": "Requires a European (Euro) profile door preparation."
+        },
+        "thickness_mm": {
+          "min": 32,
+          "max": 120,
+          "on_fail": "incompatible",
+          "fail_message": "Door thickness is outside the 32-120mm supported range.",
+          "pass_message": "Compatible with European DIN mortise preparation."
+        },
+        "handle_to_cylinder_mm": {
+          "min": 47,
+          "max": 110,
+          "on_fail": "caution",
+          "fail_message": "Handle-to-cylinder spacing is outside the documented 47-110mm range for this escutcheon — have an installer confirm fit before ordering."
+        }
+      },
+      "technology_platforms": ["BLUEnet"],
+      "wireless": ["Bluetooth LE", "NFC"],
+      "market_countries": ["GB", "DE", "FR", "ES", "IT", "NL", "BE", "IN", "AE"],
+      "needs_review": false,
+      "review_note": "Verified against XS4Original+EURO_Datasheet_en.pdf in models/xs4-original-plus-euro/datasheets/. Corrected thickness min from an earlier guess of 30mm to the real 32mm. Added a real handle-to-cylinder-distance constraint (47-110mm) as a caution-level rule. Real product is also documented compatible with Swiss-profile and Australian-standard mortise locks, which the current DoorStandard enum doesn't distinguish from euro_profile — a reasonable future enhancement, not done in this pass.",
       "source_documents": [
         "XS4Original+EURO_Datasheet_en.pdf",
         "inst_guide_xs4_original_plus_ei6xx_226864_0.pdf"
@@ -237,65 +283,25 @@
   ],
   "vision_observations": {
     "high_confidence_candidates": [
-      "door_present",
-      "door_region",
-      "frame_region",
-      "handle_region",
-      "lock_region",
-      "visible_lock_form_factor",
-      "approximate_door_material",
-      "door_style",
-      "orientation"
+      "door_present", "door_region", "frame_region", "handle_region", "lock_region",
+      "visible_lock_form_factor", "approximate_door_material", "door_style", "orientation",
+      "hinge_side_visible", "approximate_swing_direction"
     ],
     "conditional_candidates": [
-      "lock_family_from_visual_similarity",
-      "cylinder_type",
-      "deadbolt_vs_interconnected_deadbolt",
-      "stile_width_class"
+      "lock_family_from_visual_similarity", "cylinder_type",
+      "deadbolt_vs_interconnected_deadbolt", "stile_width_class", "hinge_type"
     ],
     "do_not_claim_from_single_unscaled_photo": [
-      "exact_door_thickness_mm",
-      "exact_backset_mm",
-      "exact_center_to_center_mm",
-      "exact_hole_spacing_mm",
-      "guaranteed_physical_fit"
+      "exact_door_thickness_mm", "exact_backset_mm", "exact_center_to_center_mm",
+      "exact_hole_spacing_mm", "guaranteed_physical_fit", "installation_country"
     ]
   },
   "personas": {
-    "customer": [
-      "understand_my_door",
-      "recommend_solution",
-      "visualize_solution",
-      "request_quote"
-    ],
-    "sales": [
-      "review_lead",
-      "inspect_evidence",
-      "review_compatibility",
-      "review_configuration",
-      "review_bom",
-      "prepare_quote"
-    ],
-    "installer": [
-      "view_confirmed_profile",
-      "view_configuration",
-      "view_bom",
-      "view_installation_document",
-      "capture_installation_evidence"
-    ],
-    "support": [
-      "identify_product",
-      "search_specs",
-      "troubleshoot",
-      "retrieve_installation_guidance"
-    ],
-    "admin_product": [
-      "manage_products",
-      "manage_rules",
-      "manage_components",
-      "manage_source_documents",
-      "version_rules"
-    ]
+    "customer": ["understand_my_door", "recommend_solution", "visualize_solution", "request_quote"],
+    "sales": ["review_lead", "inspect_evidence", "review_compatibility", "review_configuration", "review_bom", "prepare_quote"],
+    "installer": ["view_confirmed_profile", "view_configuration", "view_bom", "view_installation_document", "capture_installation_evidence"],
+    "support": ["identify_product", "search_specs", "troubleshoot", "retrieve_installation_guidance"],
+    "admin_product": ["manage_products", "manage_rules", "manage_components", "manage_source_documents", "version_rules", "review_ingested_specs"]
   },
   "core_entities": {
     "DoorProfile": [
@@ -389,9 +395,10 @@
     "Return a structured JSON DoorProfile with confidence per field.",
     "Correctly mark exact physical dimensions as unknown when no scale reference exists.",
     "Allow one user-confirmed measurement to update the profile.",
-    "Run the updated profile through deterministic compatibility rules.",
+    "Run the updated profile through deterministic compatibility rules driven entirely by product JSON, not hardcoded per-product logic.",
     "Return compatible, incompatible and missing-information states with reasons.",
     "Generate a configuration and BOM from the selected product.",
-    "Keep source_document/source_reference on technical facts."
+    "Keep source_document/source_reference on technical facts.",
+    "Any AI-extracted product spec (via the ingestion pipeline) is stored with needs_review=true until a human approves it."
   ]
 }

@@ -44,6 +44,18 @@ type DetailsMode =
   | 'gdpr'
   | 'analyzing';
 
+interface DetectedProfile {
+  material: 'Wood' | 'Glass';
+  materialConf: number;
+  doorStyle: string;
+  styleConf: number;
+  existingLock: string;
+  lockConf: number;
+  frameConf: number;
+  handing: string;
+  handingConf: number;
+}
+
 @Component({
   selector: 'app-wizard',
   standalone: true,
@@ -95,15 +107,11 @@ export class WizardComponent
 
   analysisResult: DoorVisionResult | null = null;
 
-  detectedProfile: {
-    material: 'Wood' | 'Glass';
-    materialConf: number;
-    doorStyle: string;
-    styleConf: number;
-    existingLock: string;
-    lockConf: number;
-    frameConf: number;
-  } | null = null;
+  // Toggles the optional installer-detail inputs (backset, center-to-center).
+  // Off by default so a casual customer sees only material/width/height/thickness.
+  showAdvancedDetails = false;
+
+  detectedProfile: DetectedProfile | null = null;
 
   readonly products = ALL_PRODUCTS;
 
@@ -226,13 +234,6 @@ export class WizardComponent
     );
   }
 
-  /*
-   * Backend recommendation result.
-   *
-   * This now works for BOTH:
-   * - scanned doors
-   * - manually configured doors
-   */
   get recommendationResults(): DoorVisionRecommendation[] {
     return (
       this.analysisResult?.recommendations ??
@@ -297,6 +298,10 @@ export class WizardComponent
     this.configChange.emit(
       this.config,
     );
+  }
+
+  toggleAdvancedDetails(): void {
+    this.showAdvancedDetails = !this.showAdvancedDetails;
   }
 
   selectEnvironment(
@@ -457,9 +462,6 @@ export class WizardComponent
 
     this.analysisResult = result;
 
-    /*
-     * Keep the original customer door photo for AR.
-     */
     if (
       this.selectedFiles.length > 0
     ) {
@@ -510,6 +512,16 @@ export class WizardComponent
       frameConf:
         this.toPercent(
           result.profile.frame.confidence,
+        ),
+
+      handing:
+        this.formatValue(
+          result.profile.handing,
+        ),
+
+      handingConf:
+        this.toPercent(
+          result.profile.handing_confidence,
         ),
     };
 
@@ -638,20 +650,6 @@ export class WizardComponent
     });
   }
 
-  /*
-   * Continue from the Door Details screen.
-   *
-   * IMPORTANT:
-   * There are now TWO paths:
-   *
-   * 1. Door was scanned:
-   *    Re-run compatibility using the confirmed
-   *    manual thickness.
-   *
-   * 2. Door was NOT scanned:
-   *    Ask the backend recommendation engine to
-   *    evaluate the manually entered door details.
-   */
   continueFromDetails(): void {
     if (
       !this.config.material ||
@@ -674,14 +672,15 @@ export class WizardComponent
 
     this.scanError = '';
 
+    const backsetMm = this.config.backsetMm ? Number(this.config.backsetMm) : undefined;
+    const centerToCenterMm = this.config.centerToCenterMm
+      ? Number(this.config.centerToCenterMm)
+      : undefined;
+
     /*
      * --------------------------------------------------
      * SCANNED FLOW
      * --------------------------------------------------
-     *
-     * Vision already produced a DoorProfile.
-     * We only update the measured thickness and
-     * let the backend compatibility engine decide.
      */
     if (this.analysisResult) {
       const profile = {
@@ -693,8 +692,9 @@ export class WizardComponent
       this.doorVision
         .checkCompatibility({
           profile,
-          door_thickness_mm:
-          thickness,
+          door_thickness_mm: thickness,
+          backset_mm: backsetMm,
+          center_to_center_mm: centerToCenterMm,
         })
         .subscribe({
           next: result => {
@@ -725,12 +725,6 @@ export class WizardComponent
      * --------------------------------------------------
      * MANUAL FLOW
      * --------------------------------------------------
-     *
-     * No scan exists, so create a recommendation
-     * from the information entered by the user.
-     *
-     * Compatibility still comes from the SAME backend
-     * deterministic compatibility engine.
      */
     this.doorVision
       .recommendProducts({
@@ -751,17 +745,12 @@ export class WizardComponent
         frame_type:
           this.config.frameType ||
           'Timber',
+
+        backset_mm: backsetMm,
+        center_to_center_mm: centerToCenterMm,
       })
       .subscribe({
         next: result => {
-          /*
-           * Store manual recommendation response
-           * in the same property used by the scanned
-           * flow.
-           *
-           * Therefore the rest of this component does
-           * not care whether the door was scanned.
-           */
           this.analysisResult =
             result;
 
@@ -783,9 +772,6 @@ export class WizardComponent
       });
   }
 
-  /*
-   * Store ONLY the product ID in DoorConfig.
-   */
   selectProduct(
     product: Product,
   ): void {
@@ -798,9 +784,6 @@ export class WizardComponent
       finish,
     });
 
-    /*
-     * Save selected product for AR.
-     */
     this.arSession.setSelectedProduct(
       product.id,
       finish,

@@ -98,6 +98,20 @@ export interface ManualDoorRecommendationRequest {
   existing_lock: string;
 
   frame_type: string;
+
+  backset_mm?: number;
+
+  center_to_center_mm?: number;
+}
+
+export interface CheckCompatibilityRequest {
+  profile: DoorVisionProfile;
+
+  door_thickness_mm?: number | null;
+
+  backset_mm?: number | null;
+
+  center_to_center_mm?: number | null;
 }
 
 @Injectable({
@@ -142,23 +156,8 @@ export class DoorVisionService {
     );
   }
 
-  /*
-   * Used after a scanned door's manually
-   * confirmed thickness is entered.
-   */
   checkCompatibility(
-    request: {
-      profile: DoorVisionProfile;
-
-      door_thickness_mm?:
-        number | null;
-
-      door_backset_mm?:
-        number | null;
-
-      center_to_center_mm?:
-        number | null;
-    },
+    request: CheckCompatibilityRequest,
   ): Observable<DoorVisionResult> {
 
     return this.http.post<DoorVisionResult>(
@@ -167,13 +166,6 @@ export class DoorVisionService {
     );
   }
 
-  /*
-   * Used when the customer skips scanning.
-   *
-   * The backend creates a DoorProfile from these
-   * manual values and sends it through the same
-   * compatibility engine.
-   */
   recommendProducts(
     request:
     ManualDoorRecommendationRequest,
