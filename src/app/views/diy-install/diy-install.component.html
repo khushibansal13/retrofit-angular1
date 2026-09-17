@@ -1,201 +1,915 @@
-﻿<div class="install-container">
+<div class="installation-page">
 
-  <header class="install-header">
-    <div class="header-icon">
-      <mat-icon>build</mat-icon>
-    </div>
+  <!-- ========================================================= -->
+  <!-- HEADER -->
+  <!-- ========================================================= -->
 
-    <div class="header-copy">
-      <span class="eyebrow">SELF INSTALLATION</span>
-      <h2>DIY Install</h2>
-      <p>
-        Step-by-step installation guidance for your configured lock.
-      </p>
+  <header class="installation-header">
+    <div class="header-inner">
+
+      <div class="header-product">
+
+        @if (productImage) {
+          <div class="product-thumb">
+            <img
+              [src]="productImage"
+              [alt]="productName"
+            />
+          </div>
+        }
+
+        <div>
+          <div class="eyebrow">
+            INSTALLATION
+          </div>
+
+          <h1>{{ productName }}</h1>
+
+          <p>{{ doorSummary }}</p>
+        </div>
+
+      </div>
+
+      <div class="header-meta">
+
+        @if (usingRealGuide) {
+          <div class="manufacturer-badge">
+            <mat-icon>verified</mat-icon>
+            <span>Manufacturer guide</span>
+          </div>
+        }
+
+        <div class="source-text">
+          @if (guideSource) {
+            Source: {{ guideSource }}
+          }
+        </div>
+
+      </div>
+
     </div>
   </header>
 
-  <main class="install-content">
 
-    <section class="product-card">
-      <div class="product-image">
-        @if (product) {
-          <img
-            [src]="product.imageUrl"
-            [alt]="product.name">
-        } @else {
-        <mat-icon>lock</mat-icon>
-      }
-      </div>
+  <!-- ========================================================= -->
+  <!-- BEFORE YOU START -->
+  <!-- ========================================================= -->
 
-      <div class="product-info">
-        <span class="product-label">YOUR CONFIGURATION</span>
-        <h3>{{ productName }}</h3>
+  @if (!started && !completed) {
 
-        <div class="product-meta">
-          <span>{{ config.material }} door</span>
-          <span>{{ config.thickness }}mm</span>
-          <span>{{ config.finish }}</span>
+    <main class="preflight">
+
+      <section class="preflight-hero">
+
+        <div class="hero-copy">
+
+          <div class="hero-kicker">
+            BEFORE YOU START
+          </div>
+
+          <h2>
+            Install your {{ productName }}
+            with confidence.
+          </h2>
+
+          <p>
+            Follow the installation sequence one step at a time.
+            The diagrams below are based on the product installation
+            documentation.
+          </p>
+
+          <div class="hero-stats">
+
+            <div class="hero-stat">
+              <mat-icon>format_list_numbered</mat-icon>
+
+              <div>
+                <strong>{{ totalSteps }} steps</strong>
+                <span>Installation sequence</span>
+              </div>
+            </div>
+
+            <div class="hero-stat">
+              <mat-icon>schedule</mat-icon>
+
+              <div>
+                <strong>{{ estimatedTime }}</strong>
+                <span>Typical installation</span>
+              </div>
+            </div>
+
+            <div class="hero-stat">
+              <mat-icon>engineering</mat-icon>
+
+              <div>
+                <strong>{{ installationLevel }}</strong>
+                <span>Difficulty</span>
+              </div>
+            </div>
+
+          </div>
+
         </div>
-      </div>
-    </section>
 
-    <section class="progress-section">
-      <div class="progress-heading">
-        <div>
-          <span class="progress-label">INSTALLATION</span>
-          <strong>
-            Step {{ currentStep + 1 }} of {{ steps.length }}
-          </strong>
-        </div>
+        @if (productImage) {
+          <div class="hero-product">
 
-        <span class="progress-percent">
-          {{ ((currentStep + 1) / steps.length * 100) | number:'1.0-0' }}%
-        </span>
-      </div>
+            <img
+              [src]="productImage"
+              [alt]="productName"
+            />
 
-      <div class="progress-track">
-        <div
-          class="progress-fill"
-          [style.width.%]="((currentStep + 1) / steps.length) * 100">
-        </div>
-      </div>
-    </section>
-
-    <section class="step-navigation">
-      @for (step of steps; track step.title; let i = $index) {
-        <button
-          type="button"
-          class="step-dot"
-          [class.active]="i === currentStep"
-          [class.completed]="i < currentStep"
-          (click)="goToStep(i)"
-          [attr.aria-label]="'Go to step ' + (i + 1)">
-          @if (i < currentStep) {
-            <mat-icon>check</mat-icon>
-          } @else {
-          {{ i + 1 }}
-        }
-        </button>
-
-        @if (i < steps.length - 1) {
-          <div
-            class="step-connector"
-            [class.completed]="i < currentStep">
           </div>
         }
-      }
-    </section>
 
-    <section class="instruction-card">
-
-      <div class="step-icon">
-        <mat-icon>{{ currentInstallStep.icon }}</mat-icon>
-      </div>
-
-      <div class="step-copy">
-        <span class="step-number">
-          STEP {{ currentStep + 1 }}
-        </span>
-
-        <h3>{{ currentInstallStep.title }}</h3>
-
-        <p>
-          {{ currentInstallStep.description }}
-        </p>
-      </div>
-
-    </section>
-
-    @if (currentInstallStep.warning) {
-      <section class="warning-card">
-        <mat-icon>warning</mat-icon>
-
-        <div>
-          <strong>Important</strong>
-          <p>{{ currentInstallStep.warning }}</p>
-        </div>
       </section>
-    }
 
-    <section class="tools-card">
-      <div class="tools-header">
-        <mat-icon>handyman</mat-icon>
+
+      <section class="preflight-grid">
+
+        <!-- WHAT YOU NEED -->
+
+        <article class="preflight-panel">
+
+          <div class="panel-heading">
+            <div class="panel-icon">
+              <mat-icon>construction</mat-icon>
+            </div>
+
+            <div>
+              <h3>What you'll need</h3>
+              <p>Have these ready before you begin.</p>
+            </div>
+          </div>
+
+          <div class="tool-list">
+
+            @for (tool of requiredTools; track tool.label) {
+              <div class="tool-row">
+                <mat-icon>{{ tool.icon }}</mat-icon>
+                <span>{{ tool.label }}</span>
+              </div>
+            }
+
+          </div>
+
+        </article>
+
+
+        <!-- PARTS -->
+
+        <article class="preflight-panel">
+
+          <div class="panel-heading">
+            <div class="panel-icon">
+              <mat-icon>inventory_2</mat-icon>
+            </div>
+
+            <div>
+              <h3>Parts involved</h3>
+              <p>Keep the supplied hardware nearby.</p>
+            </div>
+          </div>
+
+          <div class="parts-list">
+
+            @for (part of includedParts; track part) {
+              <div class="part-row">
+                <mat-icon>check</mat-icon>
+                <span>{{ part }}</span>
+              </div>
+            }
+
+          </div>
+
+        </article>
+
+
+        <!-- SAFETY -->
+
+        <article class="preflight-panel safety-panel">
+
+          <div class="panel-heading">
+
+            <div class="panel-icon safety">
+              <mat-icon>shield</mat-icon>
+            </div>
+
+            <div>
+              <h3>Before you begin</h3>
+              <p>A few things to keep in mind.</p>
+            </div>
+
+          </div>
+
+          <div class="safety-list">
+
+            @for (note of safetyNotes; track note) {
+              <div class="safety-row">
+                <mat-icon>info</mat-icon>
+                <span>{{ note }}</span>
+              </div>
+            }
+
+          </div>
+
+        </article>
+
+      </section>
+
+
+      <section class="preflight-action">
 
         <div>
-          <span>TOOLS &amp; SAFETY</span>
-          <p>
-            Keep the following ready before starting the installation.
-          </p>
+          <strong>Ready to install?</strong>
+
+          <span>
+            You'll be guided through each step.
+          </span>
         </div>
-      </div>
 
-      <div class="tools-list">
-        <span>
-          <mat-icon>build</mat-icon>
-          Screwdriver
-        </span>
-
-        <span>
-          <mat-icon>straighten</mat-icon>
-          Measuring tape
-        </span>
-
-        <span>
-          <mat-icon>architecture</mat-icon>
-          Level
-        </span>
-
-        <span>
-          <mat-icon>visibility</mat-icon>
-          Safety glasses
-        </span>
-      </div>
-    </section>
-
-    <section class="help-card">
-      <div class="help-icon">
-        <mat-icon>support_agent</mat-icon>
-      </div>
-
-      <div>
-        <strong>Need help?</strong>
-        <p>
-          If something doesn't match your configuration, stop installation
-          and contact the sales/support team.
-        </p>
-      </div>
-    </section>
-
-    <div class="navigation-buttons">
-      <button
-        mat-stroked-button
-        type="button"
-        [disabled]="isFirstStep"
-        (click)="previous()">
-        <mat-icon>arrow_back</mat-icon>
-        Previous
-      </button>
-
-      @if (!isLastStep) {
         <button
-          mat-raised-button
-          color="primary"
+          mat-flat-button
+          class="start-button"
           type="button"
-          (click)="next()">
-          Next step
+          (click)="startInstallation()"
+        >
+          Start installation
           <mat-icon>arrow_forward</mat-icon>
         </button>
-      } @else {
-      <button
-        mat-raised-button
-        color="primary"
-        type="button"
-        (click)="restart()">
-        <mat-icon>check</mat-icon>
-        Installation complete
-      </button>
-    }
+
+      </section>
+
+    </main>
+  }
+
+
+  <!-- ========================================================= -->
+  <!-- INSTALLATION WORKSPACE -->
+  <!-- ========================================================= -->
+
+  @if (started && !completed && currentInstallStep) {
+
+    <main class="workspace">
+
+      <!-- Progress -->
+
+      <section class="progress-section">
+
+        <div class="progress-top">
+
+          <div>
+            <span class="progress-label">
+              Installation progress
+            </span>
+
+            <strong>
+              Step {{ stepNumber }} of {{ totalSteps }}
+            </strong>
+          </div>
+
+          <span class="progress-percent">
+            {{ progressPercent }}%
+          </span>
+
+        </div>
+
+        <div class="progress-track">
+          <div
+            class="progress-fill"
+            [style.width.%]="progressPercent"
+          ></div>
+        </div>
+
+
+        <div class="step-strip">
+
+          @for (
+            step of steps;
+            track $index
+          ) {
+
+            <button
+              type="button"
+              class="step-marker"
+              [class.active]="$index === currentStep"
+              [class.completed]="$index < currentStep"
+              [class.warning]="step.warning"
+              (click)="goToStep($index)"
+              [attr.aria-label]="'Go to step ' + ($index + 1)"
+            >
+
+              @if ($index < currentStep) {
+                <mat-icon>check</mat-icon>
+              } @else {
+                <span>{{ $index + 1 }}</span>
+              }
+
+            </button>
+
+          }
+
+        </div>
+
+      </section>
+
+
+      <!-- Main step -->
+
+      <section class="step-workspace">
+
+        <div class="step-header">
+
+          <div class="step-number">
+            STEP {{ stepNumber }}
+          </div>
+
+          <div class="step-title-wrap">
+
+            <h2>
+              {{ currentInstallStep.title }}
+            </h2>
+
+            @if (isCriticalStep) {
+              <div class="critical-label">
+                <mat-icon>warning</mat-icon>
+                Important
+              </div>
+            }
+
+          </div>
+
+        </div>
+
+
+        <!-- ================================================= -->
+        <!-- MANUFACTURER DIAGRAM -->
+        <!-- ================================================= -->
+
+        @if (currentInstallStep.imageUrl) {
+
+          <section
+            class="diagram-panel"
+            [class.critical]="isCriticalStep"
+          >
+
+            <div class="diagram-toolbar">
+
+              <div class="diagram-source">
+
+                <mat-icon>description</mat-icon>
+
+                <span>
+                  Manufacturer reference
+                </span>
+
+              </div>
+
+              <div class="diagram-actions">
+
+                <button
+                  mat-icon-button
+                  type="button"
+                  aria-label="Zoom out"
+                  (click)="zoomOut()"
+                >
+                  <mat-icon>remove</mat-icon>
+                </button>
+
+                <span>
+                  {{ zoomPercent }}%
+                </span>
+
+                <button
+                  mat-icon-button
+                  type="button"
+                  aria-label="Zoom in"
+                  (click)="zoomIn()"
+                >
+                  <mat-icon>add</mat-icon>
+                </button>
+
+                <button
+                  mat-icon-button
+                  type="button"
+                  aria-label="Open diagram"
+                  (click)="openImage()"
+                >
+                  <mat-icon>fullscreen</mat-icon>
+                </button>
+
+              </div>
+
+            </div>
+
+
+            <button
+              type="button"
+              class="diagram-stage"
+              (click)="openImage()"
+              aria-label="Open installation diagram"
+            >
+
+              <img
+                [src]="currentInstallStep.imageUrl"
+                [alt]="currentInstallStep.title"
+              />
+
+              <div class="diagram-open-hint">
+                <mat-icon>zoom_in</mat-icon>
+                <span>Click to enlarge</span>
+              </div>
+
+            </button>
+
+          </section>
+
+        }
+
+
+        <!-- ================================================= -->
+        <!-- INSTRUCTION -->
+        <!-- ================================================= -->
+
+        <section class="instruction-panel">
+
+          <div class="instruction-heading">
+
+            <div class="instruction-icon">
+              <mat-icon>
+                {{ currentInstallStep.icon }}
+              </mat-icon>
+            </div>
+
+            <div>
+              <span>WHAT TO DO</span>
+              <h3>Follow this step</h3>
+            </div>
+
+          </div>
+
+          <p class="instruction-text">
+            {{ currentInstallStep.description }}
+          </p>
+
+        </section>
+
+
+        <!-- ================================================= -->
+        <!-- CRITICAL WARNING -->
+        <!-- ================================================= -->
+
+        @if (currentInstallStep.warning) {
+
+          <section class="warning-panel">
+
+            <div class="warning-icon">
+              <mat-icon>warning</mat-icon>
+            </div>
+
+            <div class="warning-content">
+
+              <span class="warning-label">
+                IMPORTANT
+              </span>
+
+              <p>
+                {{ currentInstallStep.warning }}
+              </p>
+
+              <label class="acknowledge">
+
+                <input
+                  type="checkbox"
+                  [checked]="currentStepAcknowledged"
+                  (change)="acknowledgeCurrentStep()"
+                />
+
+                <span>
+                  I have completed this step and understand the warning.
+                </span>
+
+              </label>
+
+            </div>
+
+          </section>
+
+        }
+
+
+        <!-- ================================================= -->
+        <!-- STEP DETAILS -->
+        <!-- ================================================= -->
+
+        <section class="detail-grid">
+
+          @if (currentStepTools.length > 0) {
+
+            <article class="detail-panel">
+
+              <div class="detail-heading">
+                <mat-icon>build</mat-icon>
+                <span>Tools for this step</span>
+              </div>
+
+              <div class="detail-items">
+
+                @for (
+                  tool of currentStepTools;
+                  track tool.label
+                ) {
+
+                  <div class="detail-item">
+                    <mat-icon>{{ tool.icon }}</mat-icon>
+                    <span>{{ tool.label }}</span>
+                  </div>
+
+                }
+
+              </div>
+
+            </article>
+
+          }
+
+
+          <article class="detail-panel">
+
+            <div class="detail-heading">
+              <mat-icon>layers</mat-icon>
+              <span>Parts involved</span>
+            </div>
+
+            <div class="detail-items">
+
+              @for (
+                part of involvedParts;
+                track part
+              ) {
+
+                <div class="detail-item">
+                  <mat-icon>check</mat-icon>
+                  <span>{{ part }}</span>
+                </div>
+
+              }
+
+            </div>
+
+          </article>
+
+        </section>
+
+
+        <!-- ================================================= -->
+        <!-- NAVIGATION -->
+        <!-- ================================================= -->
+
+        <section class="step-navigation">
+
+          <button
+            mat-stroked-button
+            type="button"
+            class="back-button"
+            [disabled]="isFirstStep"
+            (click)="previous()"
+          >
+            <mat-icon>arrow_back</mat-icon>
+            Previous
+          </button>
+
+
+          <div class="navigation-status">
+
+            @if (isCriticalStep && !currentStepAcknowledged) {
+
+              <mat-icon>lock</mat-icon>
+
+              <span>
+                Complete the step above to continue
+              </span>
+
+            } @else {
+
+              <span>
+                Step {{ stepNumber }} of {{ totalSteps }}
+              </span>
+
+            }
+
+          </div>
+
+
+          <button
+            mat-flat-button
+            type="button"
+            class="next-button"
+            [disabled]="!canContinue"
+            (click)="next()"
+          >
+
+            @if (isLastStep) {
+              Finish installation
+              <mat-icon>check</mat-icon>
+            } @else {
+              Next step
+              <mat-icon>arrow_forward</mat-icon>
+            }
+
+          </button>
+
+        </section>
+
+      </section>
+
+    </main>
+  }
+
+
+  <!-- ========================================================= -->
+  <!-- FINAL COMMISSIONING -->
+  <!-- ========================================================= -->
+
+  @if (completed) {
+
+    <main class="completion">
+
+      <section class="completion-hero">
+
+        <div class="completion-icon">
+          <mat-icon>check</mat-icon>
+        </div>
+
+        <div>
+
+          <div class="hero-kicker">
+            INSTALLATION COMPLETE
+          </div>
+
+          <h2>
+            Let's make sure everything works.
+          </h2>
+
+          <p>
+            Before putting the door into normal use, run through
+            these final checks.
+          </p>
+
+        </div>
+
+      </section>
+
+
+      <section class="commissioning-panel">
+
+        <div class="commissioning-heading">
+
+          <div>
+            <span>FINAL CHECK</span>
+            <h3>Commission your lock</h3>
+          </div>
+
+          <div class="check-count">
+            {{
+              (
+                (finalChecks.lockMounted ? 1 : 0) +
+                (finalChecks.handleTested ? 1 : 0) +
+                (finalChecks.readerTested ? 1 : 0) +
+                (finalChecks.doorTested ? 1 : 0)
+              )
+            }}/4
+          </div>
+
+        </div>
+
+
+        <div class="commissioning-list">
+
+          <label class="commissioning-row">
+
+            <input
+              type="checkbox"
+              [(ngModel)]="finalChecks.lockMounted"
+            />
+
+            <div class="commissioning-icon">
+              <mat-icon>lock</mat-icon>
+            </div>
+
+            <div>
+              <strong>Lock is securely mounted</strong>
+              <span>
+                All mounting hardware is tightened and the lock sits correctly.
+              </span>
+            </div>
+
+          </label>
+
+
+          <label class="commissioning-row">
+
+            <input
+              type="checkbox"
+              [(ngModel)]="finalChecks.handleTested"
+            />
+
+            <div class="commissioning-icon">
+              <mat-icon>pan_tool</mat-icon>
+            </div>
+
+            <div>
+              <strong>Handle and latch tested</strong>
+              <span>
+                The handle moves freely and the latch retracts correctly.
+              </span>
+            </div>
+
+          </label>
+
+
+          <label class="commissioning-row">
+
+            <input
+              type="checkbox"
+              [(ngModel)]="finalChecks.readerTested"
+            />
+
+            <div class="commissioning-icon">
+              <mat-icon>contactless</mat-icon>
+            </div>
+
+            <div>
+              <strong>Reader tested</strong>
+              <span>
+                The electronic reader responds correctly to a valid credential.
+              </span>
+            </div>
+
+          </label>
+
+
+          <label class="commissioning-row">
+
+            <input
+              type="checkbox"
+              [(ngModel)]="finalChecks.doorTested"
+            />
+
+            <div class="commissioning-icon">
+              <mat-icon>door_front</mat-icon>
+            </div>
+
+            <div>
+              <strong>Door tested several times</strong>
+              <span>
+                Open, close and lock the door repeatedly before putting it into service.
+              </span>
+            </div>
+
+          </label>
+
+        </div>
+
+
+        <div class="commissioning-actions">
+
+          <button
+            mat-stroked-button
+            type="button"
+            (click)="restart()"
+          >
+            <mat-icon>restart_alt</mat-icon>
+            Start again
+          </button>
+
+          <button
+            mat-flat-button
+            class="finish-button"
+            type="button"
+            [disabled]="!installationComplete"
+            (click)="finishInstallation()"
+          >
+            Installation verified
+            <mat-icon>verified</mat-icon>
+          </button>
+
+        </div>
+
+      </section>
+
+
+      <section class="support-escape">
+
+        <div class="support-icon">
+          <mat-icon>support_agent</mat-icon>
+        </div>
+
+        <div>
+          <strong>Something doesn't look right?</strong>
+          <span>
+            Stop before forcing any component. Get help from the support team
+            if the physical installation differs from the guide.
+          </span>
+        </div>
+
+        <button
+          mat-stroked-button
+          type="button"
+        >
+          Get support
+        </button>
+
+      </section>
+
+    </main>
+
+  }
+
+
+  <!-- ========================================================= -->
+  <!-- IMAGE LIGHTBOX -->
+  <!-- ========================================================= -->
+
+  @if (imageZoomOpen && currentInstallStep?.imageUrl) {
+
+    <div
+      class="image-lightbox"
+      role="dialog"
+      aria-modal="true"
+      (click)="closeImage()"
+    >
+
+      <div
+        class="lightbox-toolbar"
+        (click)="$event.stopPropagation()"
+      >
+
+        <div>
+          <strong>
+            {{ currentInstallStep?.title }}
+          </strong>
+
+          <span>
+            Manufacturer installation diagram
+          </span>
+        </div>
+
+        <div class="lightbox-actions">
+
+          <button
+            mat-icon-button
+            type="button"
+            (click)="zoomOut()"
+          >
+            <mat-icon>remove</mat-icon>
+          </button>
+
+          <button
+            mat-icon-button
+            type="button"
+            (click)="resetZoom()"
+          >
+            <mat-icon>fit_screen</mat-icon>
+          </button>
+
+          <button
+            mat-icon-button
+            type="button"
+            (click)="zoomIn()"
+          >
+            <mat-icon>add</mat-icon>
+          </button>
+
+          <button
+            mat-icon-button
+            type="button"
+            (click)="closeImage()"
+            aria-label="Close"
+          >
+            <mat-icon>close</mat-icon>
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <div
+        class="lightbox-stage"
+        (click)="$event.stopPropagation()"
+      >
+
+        <img
+          [src]="currentInstallStep?.imageUrl"
+          [alt]="currentInstallStep?.title"
+          [style.transform]="'scale(' + imageZoom + ')'"
+        />
+
+      </div>
+
     </div>
 
-  </main>
+  }
+
 </div>
