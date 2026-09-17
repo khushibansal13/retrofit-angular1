@@ -69,35 +69,222 @@ plain text in visual_evidence (e.g. "Knob or lever, 'EUROPA' embossed on
 faceplate"). Do not guess a brand if it isn't clearly legible.
 """
 
+
 def optimize_image(img_path: str, max_dimension: int = 1024) -> str:
+    print(f"[VISION] Optimizing image: {img_path}", flush=True)
+
     out_path = img_path + "_opt.jpg"
+
     with Image.open(img_path) as img:
+        print(
+            f"[VISION] Original image: size={img.size}, format={img.format}",
+            flush=True
+        )
+
         img = img.convert("RGB")
-        img.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
+        img.thumbnail(
+            (max_dimension, max_dimension),
+            Image.Resampling.LANCZOS
+        )
+
+        print(
+            f"[VISION] Optimized image size: {img.size}",
+            flush=True
+        )
+
         img.save(out_path, "JPEG", quality=85)
+
+    print(f"[VISION] Optimized image created: {out_path}", flush=True)
+
     return out_path
 
+
 def analyze_door_for_salto(image_paths: List[str]) -> DoorProfile:
-    optimized_paths = [optimize_image(p) for p in image_paths]
+    print("\n" + "=" * 80, flush=True)
+    print("[VISION] STARTING SALTO DOOR ANALYSIS", flush=True)
+    print(f"[VISION] Model: {MODEL_NAME}", flush=True)
+    print(f"[VISION] Number of input images: {len(image_paths)}", flush=True)
+    print(f"[VISION] Input images: {image_paths}", flush=True)
+    print("=" * 80, flush=True)
+
+    optimized_paths = []
+
     try:
+        # ---------------------------------------------------------
+        # Optimize images
+        # ---------------------------------------------------------
+        for image_path in image_paths:
+            print(
+                f"[VISION] Checking image: {image_path}",
+                flush=True
+            )
+
+            if not os.path.exists(image_path):
+                print(
+                    f"[VISION][ERROR] Image does not exist: {image_path}",
+                    flush=True
+                )
+                raise FileNotFoundError(image_path)
+
+            optimized_path = optimize_image(image_path)
+            optimized_paths.append(optimized_path)
+
+        print(
+            f"[VISION] Prepared {len(optimized_paths)} images for Ollama",
+            flush=True
+        )
+
+        print(
+            f"[VISION] Images being sent: {optimized_paths}",
+            flush=True
+        )
+
+        # ---------------------------------------------------------
+        # Send request to Ollama
+        # ---------------------------------------------------------
+        print("\n[VISION] Calling Ollama...", flush=True)
+        print(f"[VISION] Model: {MODEL_NAME}", flush=True)
+        print("[VISION] Temperature: 0.0", flush=True)
+        print("[VISION] Context: 16384", flush=True)
+        print(
+            "[VISION] Asking model to classify lock and extract "
+            "retrofit parameters...",
+            flush=True
+        )
+
         response = chat(
             model=MODEL_NAME,
             messages=[
-                {"role": "system", "content": SALTO_VISION_PROMPT},
+                {
+                    "role": "system",
+                    "content": SALTO_VISION_PROMPT
+                },
                 {
                     "role": "user",
-                    "content": "Extract door parameters for Salto retrofit compatibility. Output strictly JSON.",
+                    "content": (
+                        "Extract door parameters for Salto retrofit "
+                        "compatibility. Output strictly JSON."
+                    ),
                     "images": optimized_paths
                 }
             ],
             format=DoorProfile.model_json_schema(),
-            options={"temperature": 0.0, "num_ctx": 16384}
+            options={
+                "temperature": 0.0,
+                "num_ctx": 16384
+            }
         )
-        return DoorProfile.model_validate_json(response.message.content)
+
+        print("\n[VISION] Ollama response received", flush=True)
+
+        # ---------------------------------------------------------
+        # Raw model response
+        # ---------------------------------------------------------
+        raw_response = response.message.content
+
+        print("\n" + "-" * 80, flush=True)
+        print("[VISION] RAW MODEL RESPONSE:", flush=True)
+        print(raw_response, flush=True)
+        print("-" * 80, flush=True)
+
+        # ---------------------------------------------------------
+        # Validate response
+        # ---------------------------------------------------------
+        print(
+            "[VISION] Validating model response against DoorProfile...",
+            flush=True
+        )
+
+        door_profile = DoorProfile.model_validate_json(raw_response)
+
+        print(
+            "[VISION] DoorProfile validation successful",
+            flush=True
+        )
+
+        # ---------------------------------------------------------
+        # Print extracted values
+        # ---------------------------------------------------------
+        print("\n" + "-" * 80, flush=True)
+        print("[VISION] DETECTED DOOR PARAMETERS:", flush=True)
+
+        print(
+            f"[VISION] door_standard = "
+            f"{getattr(door_profile, 'door_standard', None)}",
+            flush=True
+        )
+
+        print(
+            f"[VISION] lock_type = "
+            f"{getattr(door_profile, 'lock_type', None)}",
+            flush=True
+        )
+
+        print(
+            f"[VISION] cylinder_visible = "
+            f"{getattr(door_profile, 'cylinder_visible', None)}",
+            flush=True
+        )
+
+        print(
+            f"[VISION] deadbolt_present = "
+            f"{getattr(door_profile, 'deadbolt_present', None)}",
+            flush=True
+        )
+
+        print(
+            f"[VISION] visual_evidence = "
+            f"{getattr(door_profile, 'visual_evidence', None)}",
+            flush=True
+        )
+
+        print("-" * 80, flush=True)
+
+        print(
+            "[VISION] FINAL DoorProfile:",
+            flush=True
+        )
+        print(
+            door_profile.model_dump_json(indent=2),
+            flush=True
+        )
+
+        print("\n[VISION] SALTO DOOR ANALYSIS COMPLETED", flush=True)
+        print("=" * 80 + "\n", flush=True)
+
+        return door_profile
+
+    except Exception as e:
+        print("\n" + "=" * 80, flush=True)
+        print("[VISION][ERROR] SALTO DOOR ANALYSIS FAILED", flush=True)
+        print(
+            f"[VISION][ERROR] {type(e).__name__}: {e}",
+            flush=True
+        )
+        print("=" * 80, flush=True)
+        raise
+
     finally:
+        # ---------------------------------------------------------
+        # Cleanup optimized images
+        # ---------------------------------------------------------
+        print(
+            "[VISION] Cleaning up optimized images...",
+            flush=True
+        )
+
         for p in optimized_paths:
             if os.path.exists(p):
                 try:
                     os.remove(p)
-                except OSError:
-                    pass
+                    print(
+                        f"[VISION] Removed temporary image: {p}",
+                        flush=True
+                    )
+                except OSError as e:
+                    print(
+                        f"[VISION][WARNING] Failed to remove {p}: {e}",
+                        flush=True
+                    )
+
+        print("[VISION] Cleanup complete", flush=True)
