@@ -1,27 +1,8 @@
 from typing import List
-import logging
 import os
 from PIL import Image
-from schema import (
-    ComponentObs,
-    DoorProfile,
-    DoorStandard,
-    Handing,
-    HandleObs,
-    HandlePosition,
-    HandleType,
-    LockObs,
-    LockType,
-    StileWidthClass,
-    ThicknessClass,
-)
-
-try:
-    from ollama import chat
-except ImportError:
-    chat = None
-
-logger = logging.getLogger("door_vision_analyzer")
+from ollama import chat
+from schema import DoorProfile
 
 # 7b as the default now. Override with ANALYZER_MODEL=qwen2.5vl:3b if you
 # ever need to fall back for speed on a specific run.
@@ -178,119 +159,63 @@ def analyze_door_for_salto(image_paths: List[str]) -> DoorProfile:
                 flush=True
             )
 
-            if not os.path.exists(image_path):
-                print(
-                    f"[VISION][ERROR] Image does not exist: {image_path}",
-                    flush=True
-                )
-                raise FileNotFoundError(image_path)
-
-            optimized_path = optimize_image(image_path)
-            optimized_paths.append(optimized_path)
-
+        # ---------------------------------------------------------
+        # Call Ollama
+        # ---------------------------------------------------------
+        print("\n[VISION] STEP 2: Calling Ollama...", flush=True)
+        print(f"[VISION] Model: {MODEL_NAME}", flush=True)
         print(
-            f"[VISION] Prepared {len(optimized_paths)} images for Ollama",
+            f"[VISION] Sending {len(optimized_paths)} image(s) to model",
             flush=True
         )
+        print("[VISION] Temperature: 0.0", flush=True)
+        print("[VISION] Context: 8192", flush=True)
+        print("[VISION] Keep alive: 30m", flush=True)
+        print("[VISION] Waiting for model response...", flush=True)
 
-        print(
-            f"[VISION] Images being sent: {optimized_paths}",
-            flush=True
+        response = chat(
+            model=MODEL_NAME,
+            messages=[
+                {
+                    "role": "system",
+                    "content": SALTO_VISION_PROMPT
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        "Extract door parameters for Salto retrofit "
+                        "compatibility. Output strictly JSON."
+                    ),
+                    "images": optimized_paths
+                }
+            ],
+            format=DoorProfile.model_json_schema(),
+            options={
+                "temperature": 0.0,
+                "num_ctx": 8192
+            },
+            keep_alive="30m",
         )
 
-        door_profile = None
-        if chat is not None:
-            try:
-                # ---------------------------------------------------------
-                # Send request to Ollama
-                # ---------------------------------------------------------
-                print("\n[VISION] Calling Ollama...", flush=True)
-                print(f"[VISION] Model: {MODEL_NAME}", flush=True)
-                print("[VISION] Temperature: 0.0", flush=True)
-                print("[VISION] Context: 16384", flush=True)
-                print(
-                    "[VISION] Asking model to classify lock and extract "
-                    "retrofit parameters...",
-                    flush=True
-                )
+        print("\n[VISION] Ollama response received!", flush=True)
 
-                response = chat(
-                    model=MODEL_NAME,
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": SALTO_VISION_PROMPT
-                        },
-                        {
-                            "role": "user",
-                            "content": (
-                                "Extract door parameters for Salto retrofit "
-                                "compatibility. Output strictly JSON."
-                            ),
-                            "images": optimized_paths
-                        }
-                    ],
-                    format=DoorProfile.model_json_schema(),
-                    options={
-                        "temperature": 0.0,
-                        "num_ctx": 16384
-                    }
-                )
+        # ---------------------------------------------------------
+        # Raw response
+        # ---------------------------------------------------------
+        raw_response = response.message.content
 
-                print("\n[VISION] Ollama response received", flush=True)
+        print("\n" + "-" * 70, flush=True)
+        print("[VISION] RAW MODEL RESPONSE:", flush=True)
+        print("-" * 70, flush=True)
+        print(raw_response, flush=True)
+        print("-" * 70, flush=True)
 
-                raw_response = response.message.content
+        # ---------------------------------------------------------
+        # Validate response
+        # ---------------------------------------------------------
+        print("\n[VISION] STEP 3: Validating model response...", flush=True)
 
-                print("\n" + "-" * 80, flush=True)
-                print("[VISION] RAW MODEL RESPONSE:", flush=True)
-                print(raw_response, flush=True)
-                print("-" * 80, flush=True)
-
-                print(
-                    "[VISION] Validating model response against DoorProfile...",
-                    flush=True
-                )
-
-                door_profile = DoorProfile.model_validate_json(raw_response)
-            except Exception as e:
-                print(f"[VISION][WARNING] Ollama inference failed: {e}. Falling back to default profile.", flush=True)
-
-        if door_profile is None:
-            print("[VISION] Using fallback Euro-profile door parameters.", flush=True)
-            door_profile = DoorProfile(
-                door_material="Wood",
-                material_confidence=0.90,
-                door_style="Interior",
-                door_standard=DoorStandard.EURO_PROFILE,
-                door_standard_confidence=0.88,
-                handing=Handing.LEFT_HAND,
-                handing_confidence=0.80,
-                approx_thickness_class=ThicknessClass.STANDARD_35_55MM,
-                stile_width_class=StileWidthClass.WIDE_OVER_60MM,
-                lock=LockObs(
-                    detected=True,
-                    confidence=0.91,
-                    visual_evidence="Euro-profile mortise cylinder lock with escutcheon and lever handle identified.",
-                    lock_type=LockType.EURO_CYLINDER,
-                    cylinder_visible=True,
-                    deadbolt_present=False
-                ),
-                frame=ComponentObs(
-                    detected=True,
-                    confidence=0.85,
-                    visual_evidence="Standard wooden door frame visible."
-                ),
-                handle=HandleObs(
-                    detected=True,
-                    confidence=0.90,
-                    visual_evidence="Standard lever handle visible.",
-                    handle_position=HandlePosition.CENTER,
-                    handle_type=HandleType.LEVER
-                ),
-                measured_thickness_mm=None,
-                measured_backset_mm=None,
-                measured_center_to_center_mm=None,
-            )
+        result = DoorProfile.model_validate_json(raw_response)
 
         print("[VISION] Validation successful!", flush=True)
 
