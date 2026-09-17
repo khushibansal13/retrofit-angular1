@@ -1,5 +1,3 @@
-
-
 import argparse
 import json
 import os
@@ -8,20 +6,32 @@ from typing import List
 
 import requests
 from bs4 import BeautifulSoup
-from ollama import chat
+from ollama import Client
 
 
 # Separate from ANALYZER_MODEL_NAME (analyzer.py) since this is a text-only
 # extraction task, not vision — a plain instruction-following model is fine
 # and is usually faster/cheaper than a VL model for this.
-INGEST_MODEL_NAME = os.environ.get("INGEST_MODEL_NAME", "qwen2.5:7b")
+INGEST_MODEL_NAME = os.environ.get(
+    "INGEST_MODEL_NAME",
+    "qwen2.5:3b",
+)
+
+# Railway Ollama service
+OLLAMA_HOST = os.environ.get(
+    "OLLAMA_HOST",
+    "https://thriving-healing-production-0738.up.railway.app",
+)
+
+ollama_client = Client(host=OLLAMA_HOST)
+
 
 REVIEW_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "product_ingest_review",
 )
 
-MAX_SOURCE_CHARS = 12000  # keep prompt within a sane context budget per source
+MAX_SOURCE_CHARS = 12000
 
 
 # =========================================================
@@ -40,7 +50,11 @@ def fetch_text(source: str) -> str:
 
 
 def _fetch_url_text(url: str) -> str:
-    response = requests.get(url, timeout=30, headers={"User-Agent": "RetrofitAI-Ingest/0.1"})
+    response = requests.get(
+        url,
+        timeout=30,
+        headers={"User-Agent": "RetrofitAI-Ingest/0.1"},
+    )
     response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "html.parser")
@@ -50,6 +64,7 @@ def _fetch_url_text(url: str) -> str:
 
     text = soup.get_text(separator="\n")
     lines = [line.strip() for line in text.splitlines()]
+
     return "\n".join(line for line in lines if line)
 
 
@@ -58,16 +73,13 @@ def _fetch_pdf_text(path: str) -> str:
 
     reader = PdfReader(path)
     pages = [page.extract_text() or "" for page in reader.pages]
+
     return "\n".join(pages)
 
 
 # =========================================================
 # EXTRACTION SCHEMA
 # =========================================================
-#
-# Shape mirrors the compatibility_rules / product-level fields already used
-# in retrofit_ai_demo_seed_dataset.json, so a reviewed result can be copied
-# in with minimal reshaping.
 
 EXTRACTION_SCHEMA = {
     "type": "object",
@@ -75,40 +87,91 @@ EXTRACTION_SCHEMA = {
         "product_id": {"type": "string"},
         "extraction_notes": {
             "type": "string",
-            "description": "Anything ambiguous, conflicting, or not found in the source text — be explicit about gaps rather than guessing.",
+            "description": (
+                "Anything ambiguous, conflicting, or not found in the "
+                "source text — be explicit about gaps rather than guessing."
+            ),
         },
         "door_standard": {
             "type": "array",
             "items": {"type": "string"},
-            "description": "Door/lock standards this product is documented to fit, in the source's own words.",
+            "description": (
+                "Door/lock standards this product is documented to fit, "
+                "in the source's own words."
+            ),
         },
-        "lock_type": {"type": "array", "items": {"type": "string"}},
-        "door_thickness_mm_min": {"type": ["number", "null"]},
-        "door_thickness_mm_max": {"type": ["number", "null"]},
-        "backset_mm": {"type": "array", "items": {"type": "number"}},
-        "center_to_center_mm": {"type": "array", "items": {"type": "number"}},
-        "face_plates": {"type": "array", "items": {"type": "string"}},
-        "levers": {"type": "array", "items": {"type": "string"}},
+        "lock_type": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+        "door_thickness_mm_min": {
+            "type": ["number", "null"],
+        },
+        "door_thickness_mm_max": {
+            "type": ["number", "null"],
+        },
+        "backset_mm": {
+            "type": "array",
+            "items": {"type": "number"},
+        },
+        "center_to_center_mm": {
+            "type": "array",
+            "items": {"type": "number"},
+        },
+        "face_plates": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+        "levers": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
         "handing_support": {
             "type": "string",
-            "enum": ["left_hand_only", "right_hand_only", "both_reversible", "unknown"],
+            "enum": [
+                "left_hand_only",
+                "right_hand_only",
+                "both_reversible",
+                "unknown",
+            ],
         },
         "swing_direction_support": {
             "type": "string",
-            "enum": ["inward_only", "outward_only", "both", "unknown"],
+            "enum": [
+                "inward_only",
+                "outward_only",
+                "both",
+                "unknown",
+            ],
         },
         "hinge_notes": {
             "type": "string",
-            "description": "Any hinge/clearance requirement mentioned in the source. Empty string if none found.",
+            "description": (
+                "Any hinge/clearance requirement mentioned in the source. "
+                "Empty string if none found."
+            ),
         },
         "market_countries_or_regions": {
             "type": "array",
             "items": {"type": "string"},
-            "description": "Countries/regions the source explicitly states this product targets or is certified for. Do NOT infer from language of the page alone.",
+            "description": (
+                "Countries/regions the source explicitly states this "
+                "product targets or is certified for. Do NOT infer "
+                "from language of the page alone."
+            ),
         },
-        "certifications": {"type": "array", "items": {"type": "string"}},
-        "technology_platforms": {"type": "array", "items": {"type": "string"}},
-        "wireless": {"type": "array", "items": {"type": "string"}},
+        "certifications": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+        "technology_platforms": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+        "wireless": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
     },
     "required": [
         "product_id",
@@ -130,6 +193,7 @@ EXTRACTION_SCHEMA = {
         "wireless",
     ],
 }
+
 
 EXTRACTION_PROMPT = """
 You are extracting structured technical specifications for a SALTO access
@@ -158,10 +222,13 @@ def extract_product_spec(product_id: str, source_texts: List[str]) -> dict:
         text[:MAX_SOURCE_CHARS] for text in source_texts
     )
 
-    response = chat(
+    response = ollama_client.chat(
         model=INGEST_MODEL_NAME,
         messages=[
-            {"role": "system", "content": EXTRACTION_PROMPT},
+            {
+                "role": "system",
+                "content": EXTRACTION_PROMPT,
+            },
             {
                 "role": "user",
                 "content": (
@@ -174,13 +241,16 @@ def extract_product_spec(product_id: str, source_texts: List[str]) -> dict:
         options={"temperature": 0},
     )
 
-    result = json.loads(response.message.content.strip())
+    result = json.loads(
+        response.message.content.strip()
+    )
 
-    # Always force this — an LLM extraction is a first draft, never a
-    # trusted source for data that gates a compatibility decision.
     result["needs_human_review"] = True
     result["extraction_model"] = INGEST_MODEL_NAME
-    result["extracted_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    result["extracted_at"] = time.strftime(
+        "%Y-%m-%dT%H:%M:%SZ",
+        time.gmtime(),
+    )
 
     return result
 
@@ -190,21 +260,34 @@ def extract_product_spec(product_id: str, source_texts: List[str]) -> dict:
 # =========================================================
 
 def main():
-    parser = argparse.ArgumentParser(description="Ingest SALTO product specs via LLM extraction.")
-    parser.add_argument("--product-id", required=True)
+    parser = argparse.ArgumentParser(
+        description="Ingest SALTO product specs via LLM extraction."
+    )
+
+    parser.add_argument(
+        "--product-id",
+        required=True,
+    )
+
     parser.add_argument(
         "--source",
         action="append",
         required=True,
         help="A URL or local file (.pdf/.txt/.md). Repeatable.",
     )
+
     args = parser.parse_args()
 
-    print(f"[Ingest] Fetching {len(args.source)} source(s) for {args.product_id}...")
+    print(
+        f"[Ingest] Fetching {len(args.source)} source(s) "
+        f"for {args.product_id}..."
+    )
 
     source_texts = []
+
     for source in args.source:
         print(f"[Ingest]   - {source}")
+
         try:
             text = fetch_text(source)
             source_texts.append(text)
@@ -212,22 +295,49 @@ def main():
             print(f"[Ingest]     FAILED: {error}")
 
     if not source_texts:
-        raise SystemExit("No sources could be fetched. Aborting.")
+        raise SystemExit(
+            "No sources could be fetched. Aborting."
+        )
 
-    print(f"[Ingest] Extracting structured spec with {INGEST_MODEL_NAME}...")
-    result = extract_product_spec(args.product_id, source_texts)
+    print(
+        f"[Ingest] Extracting structured spec with "
+        f"{INGEST_MODEL_NAME}..."
+    )
+
+    result = extract_product_spec(
+        args.product_id,
+        source_texts,
+    )
 
     os.makedirs(REVIEW_DIR, exist_ok=True)
+
     out_path = os.path.join(
         REVIEW_DIR,
         f"{args.product_id}_{int(time.time())}.json",
     )
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(result, f, indent=2)
+
+    with open(
+        out_path,
+        "w",
+        encoding="utf-8",
+    ) as f:
+        json.dump(
+            result,
+            f,
+            indent=2,
+        )
 
     print(f"[Ingest] Wrote review file: {out_path}")
-    print("[Ingest] This is a DRAFT — verify every field against the real datasheet")
-    print("[Ingest] before copying anything into retrofit_ai_demo_seed_dataset.json.")
+
+    print(
+        "[Ingest] This is a DRAFT — verify every field "
+        "against the real datasheet"
+    )
+
+    print(
+        "[Ingest] before copying anything into "
+        "retrofit_ai_demo_seed_dataset.json."
+    )
 
 
 if __name__ == "__main__":

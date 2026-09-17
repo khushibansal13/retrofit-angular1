@@ -1,12 +1,24 @@
 from typing import List
 import os
 from PIL import Image
-from ollama import chat
+from ollama import Client
 from schema import DoorProfile
 
-# 7b as the default now. Override with ANALYZER_MODEL=qwen2.5vl:3b if you
-# ever need to fall back for speed on a specific run.
-MODEL_NAME = os.environ.get("ANALYZER_MODEL", "qwen2.5vl:3b")
+
+# Vision model used for door analysis
+MODEL_NAME = os.environ.get(
+    "ANALYZER_MODEL",
+    "qwen2.5vl:3b",
+)
+
+# Railway Ollama service
+OLLAMA_HOST = os.environ.get(
+    "OLLAMA_HOST",
+    "https://thriving-healing-production-0738.up.railway.app",
+)
+
+ollama_client = Client(host=OLLAMA_HOST)
+
 
 SALTO_VISION_PROMPT = """You are a senior access control surveyor for Salto Systems.
 Inspect the multi-angle photos of the door and classify it into EXACTLY ONE of the
@@ -40,8 +52,7 @@ another — that combination is always wrong.
 
 3. Deadbolt + handle combo (interconnected):
    A deadbolt cylinder and a handle/knob mounted close together and clearly
-   operated as one linked unit (single connecting plate or rod visible
-   between them).
+   operated as one linked unit (single connecting plate or rod visible).
      -> door_standard: "US_interconnected"
      -> lock_type: "interconnected_deadbolt"
      -> deadbolt_present: true
@@ -105,18 +116,18 @@ def optimize_image(img_path: str, max_dimension: int = 1024) -> str:
     with Image.open(img_path) as img:
         print(
             f"[VISION] Original image size: {img.size[0]}x{img.size[1]}",
-            flush=True
+            flush=True,
         )
 
         img = img.convert("RGB")
         img.thumbnail(
             (max_dimension, max_dimension),
-            Image.Resampling.LANCZOS
+            Image.Resampling.LANCZOS,
         )
 
         print(
             f"[VISION] Optimized image size: {img.size[0]}x{img.size[1]}",
-            flush=True
+            flush=True,
         )
 
         img.save(out_path, "JPEG", quality=85)
@@ -132,6 +143,7 @@ def analyze_door_for_salto(image_paths: List[str]) -> DoorProfile:
     print("=" * 70, flush=True)
 
     print(f"[VISION] Model: {MODEL_NAME}", flush=True)
+    print(f"[VISION] Ollama host: {OLLAMA_HOST}", flush=True)
     print(f"[VISION] Input image count: {len(image_paths)}", flush=True)
 
     for i, path in enumerate(image_paths, start=1):
@@ -150,13 +162,13 @@ def analyze_door_for_salto(image_paths: List[str]) -> DoorProfile:
 
         print(
             f"[VISION] Optimized {len(optimized_paths)} image(s)",
-            flush=True
+            flush=True,
         )
 
         for i, path in enumerate(optimized_paths, start=1):
             print(
                 f"[VISION] Optimized image {i}: {path}",
-                flush=True
+                flush=True,
             )
 
         # ---------------------------------------------------------
@@ -164,21 +176,22 @@ def analyze_door_for_salto(image_paths: List[str]) -> DoorProfile:
         # ---------------------------------------------------------
         print("\n[VISION] STEP 2: Calling Ollama...", flush=True)
         print(f"[VISION] Model: {MODEL_NAME}", flush=True)
+        print(f"[VISION] Ollama host: {OLLAMA_HOST}", flush=True)
         print(
             f"[VISION] Sending {len(optimized_paths)} image(s) to model",
-            flush=True
+            flush=True,
         )
         print("[VISION] Temperature: 0.0", flush=True)
         print("[VISION] Context: 8192", flush=True)
         print("[VISION] Keep alive: 30m", flush=True)
         print("[VISION] Waiting for model response...", flush=True)
 
-        response = chat(
+        response = ollama_client.chat(
             model=MODEL_NAME,
             messages=[
                 {
                     "role": "system",
-                    "content": SALTO_VISION_PROMPT
+                    "content": SALTO_VISION_PROMPT,
                 },
                 {
                     "role": "user",
@@ -186,13 +199,13 @@ def analyze_door_for_salto(image_paths: List[str]) -> DoorProfile:
                         "Extract door parameters for Salto retrofit "
                         "compatibility. Output strictly JSON."
                     ),
-                    "images": optimized_paths
-                }
+                    "images": optimized_paths,
+                },
             ],
             format=DoorProfile.model_json_schema(),
             options={
                 "temperature": 0.0,
-                "num_ctx": 8192
+                "num_ctx": 8192,
             },
             keep_alive="30m",
         )
@@ -228,32 +241,32 @@ def analyze_door_for_salto(image_paths: List[str]) -> DoorProfile:
 
         print(
             f"[VISION] door_standard      = {result.door_standard}",
-            flush=True
+            flush=True,
         )
 
         print(
             f"[VISION] lock_type           = {result.lock.lock_type}",
-            flush=True
+            flush=True,
         )
 
         print(
             f"[VISION] cylinder_visible    = {result.lock.cylinder_visible}",
-            flush=True
+            flush=True,
         )
 
         print(
             f"[VISION] deadbolt_present    = {result.lock.deadbolt_present}",
-            flush=True
+            flush=True,
         )
 
         print(
             f"[VISION] door_material       = {result.door_material}",
-            flush=True
+            flush=True,
         )
 
         print(
             f"[VISION] visual_evidence     = {result.lock.visual_evidence}",
-            flush=True
+            flush=True,
         )
 
         print("-" * 70, flush=True)
@@ -261,7 +274,7 @@ def analyze_door_for_salto(image_paths: List[str]) -> DoorProfile:
         print("\n[VISION] FINAL DoorProfile:", flush=True)
         print(
             result.model_dump_json(indent=2),
-            flush=True
+            flush=True,
         )
 
         print("\n[VISION] SALTO DOOR ANALYSIS COMPLETE", flush=True)
@@ -281,7 +294,10 @@ def analyze_door_for_salto(image_paths: List[str]) -> DoorProfile:
         # ---------------------------------------------------------
         # Cleanup
         # ---------------------------------------------------------
-        print("\n[VISION] STEP 4: Cleaning up optimized images...", flush=True)
+        print(
+            "\n[VISION] STEP 4: Cleaning up optimized images...",
+            flush=True,
+        )
 
         for p in optimized_paths:
             if os.path.exists(p):
@@ -289,12 +305,12 @@ def analyze_door_for_salto(image_paths: List[str]) -> DoorProfile:
                     os.remove(p)
                     print(
                         f"[VISION] Deleted: {p}",
-                        flush=True
+                        flush=True,
                     )
                 except OSError as e:
                     print(
                         f"[VISION] Could not delete {p}: {e}",
-                        flush=True
+                        flush=True,
                     )
 
         print("[VISION] Cleanup complete.", flush=True)
