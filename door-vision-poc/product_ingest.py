@@ -18,9 +18,10 @@ INGEST_MODEL_NAME = os.environ.get(
 )
 
 # Railway Ollama service
+# Ollama running locally, exposed to Railway through Cloudflare Tunnel
 OLLAMA_HOST = os.environ.get(
     "OLLAMA_HOST",
-    "https://thriving-healing-production-0738.up.railway.app",
+    "https://but-originally-breakdown-existed.trycloudflare.com",
 )
 
 ollama_client = Client(host=OLLAMA_HOST)
