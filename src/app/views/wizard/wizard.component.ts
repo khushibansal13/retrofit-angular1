@@ -14,6 +14,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { Subscription } from 'rxjs';
 
 import { DoorConfig } from '../../app';
 import {
@@ -408,9 +409,6 @@ export class WizardComponent
     { value: 'wireless', label: 'Wireless', hint: 'Battery + BLE/RF' },
   ];
 
-  // Now also shown on the business-profile carousel (step 3), not just the
-  // specs screen — usage patterns are a business-context question, so they
-  // belong alongside domain/budget.
   readonly usageTrafficOptions: ChoiceOption[] = [
     { value: 'low', label: 'Low', hint: '< 50 uses/day' },
     { value: 'medium', label: 'Medium', hint: '50–200 uses/day' },
@@ -462,6 +460,8 @@ export class WizardComponent
 
   private detectTimer:
     ReturnType<typeof setTimeout> | null = null;
+
+  private scanSubscription: Subscription | null = null;
 
   get selectedProduct(): Product | undefined {
     if (!this.config.product) {
@@ -627,8 +627,6 @@ export class WizardComponent
     this.bizStep = 1;
   }
 
-  // New: picking a budget now advances to the usage-traffic slide, the same
-  // way picking a domain advances to budget.
   selectBudget(id: string): void {
     this.set('budget', id);
     this.bizStep = 2;
@@ -915,7 +913,12 @@ export class WizardComponent
         }
       }, 120);
 
-    this.doorVision
+    // Cancel any previous scan that hasn't resolved yet — without this, a
+    // slow/abandoned earlier scan can resolve minutes later and silently
+    // overwrite whatever screen you've since moved on to.
+    this.scanSubscription?.unsubscribe();
+
+    this.scanSubscription = this.doorVision
       .analyzeDoor(
         this.selectedFiles,
       )
@@ -948,6 +951,13 @@ export class WizardComponent
   private handleAnalysisSuccess(
     result: DoorVisionResult,
   ): void {
+    // A stale/abandoned scan resolving after the user has already moved on
+    // (new scan started, or navigated away from the analyzing screen) must
+    // be ignored — otherwise it silently overwrites the current state.
+    if (this.detailsMode !== 'analyzing') {
+      return;
+    }
+
     this.clearTimers();
 
     this.scanProgress = 100;
@@ -1059,7 +1069,7 @@ export class WizardComponent
       backsetMm: result.profile.measured_backset_mm,
       centerToCenterMm: result.profile.measured_center_to_center_mm,
 
-        doorStandard:
+      doorStandard:
         this.formatValue(
           result.profile.door_standard,
         ),
@@ -1155,6 +1165,10 @@ export class WizardComponent
   private handleAnalysisError(
     error: unknown,
   ): void {
+    if (this.detailsMode !== 'analyzing') {
+      return;
+    }
+
     this.clearTimers();
 
     this.scanProgress = 0;
@@ -1730,6 +1744,7 @@ export class WizardComponent
   ngOnDestroy(): void {
     this.clearTimers();
     this.stopCameraStream();
+    this.scanSubscription?.unsubscribe();
     this.filePreviews.forEach(p => URL.revokeObjectURL(p.url));
   }
 
