@@ -1047,7 +1047,7 @@
 
         <div class="privacy-card"><mat-icon>shield</mat-icon><div><strong>Privacy & GDPR</strong><p>Your door configuration and any AR screenshots will be shared with our Sales team for quotation purposes only.</p><label class="check-row"><input type="checkbox" [checked]="config.gdprAccepted" (change)="set('gdprAccepted', $any($event.target).checked)"><span>I confirm this submission contains no personal data or identifiable images of individuals.</span></label></div></div>
 
-        <button type="button" class="primary-button submit full" [disabled]="!selectedProduct || !fit || !config.gdprAccepted || quantity < 1" (click)="finishWizard()"><mat-icon>view_in_ar</mat-icon> Submit & View in AR</button>
+        <button type="button" class="primary-button submit full" (click)="finishWizard()"><mat-icon>view_in_ar</mat-icon> Submit & View in AR</button>
       </section>
     }
   </main>
