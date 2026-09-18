@@ -906,16 +906,35 @@ async def check_compatibility(
 
     try:
 
+        profile_data = (
+            request.profile.model_dump()
+        )
+
+        if request.door_thickness_mm is not None:
+            profile_data["measured_thickness_mm"] = request.door_thickness_mm
+
+        if request.backset_mm is not None:
+            profile_data["measured_backset_mm"] = request.backset_mm
+
+        if request.center_to_center_mm is not None:
+            profile_data["measured_center_to_center_mm"] = request.center_to_center_mm
+
+        profile = (
+            DoorProfile.model_validate(
+                profile_data
+            )
+        )
+
         results = (
             compatibility_engine.evaluate(
-                request.profile
+                profile
             )
         )
 
         return {
 
             "profile":
-                request.profile.model_dump(),
+                profile.model_dump(),
 
             "recommendations":
                 results,
@@ -942,35 +961,14 @@ async def recommend_products(
 
     try:
 
-        # -------------------------------------------------
-        # Convert manual form values into DoorProfile
-        # -------------------------------------------------
+        if request.door_thickness_mm <= 0:
 
-        profile = DoorProfile(
+            raise HTTPException(
+                status_code=400,
+                detail="Door thickness must be greater than 0 mm.",
+            )
 
-            door_material=
-                DoorMaterial(
-                    request.door_material
-                ),
-
-            door_thickness_mm=
-                request.door_thickness_mm,
-
-            door_type=
-                request.door_type,
-
-            existing_lock=
-                request.existing_lock,
-
-            frame_type=
-                request.frame_type,
-
-            backset_mm=
-                request.backset_mm,
-
-            center_to_center_mm=
-                request.center_to_center_mm,
-        )
+        profile = build_manual_door_profile(request)
 
         results = (
             compatibility_engine.evaluate(
@@ -987,6 +985,9 @@ async def recommend_products(
                 results,
         }
 
+    except HTTPException:
+        raise
+
     except ValueError as error:
 
         raise HTTPException(
@@ -1000,6 +1001,172 @@ async def recommend_products(
             status_code=500,
             detail=str(error),
         )
+
+
+# =========================================================
+# Build manual DoorProfile
+# =========================================================
+
+def build_manual_door_profile(
+    request: ManualDoorRecommendationRequest,
+) -> DoorProfile:
+
+    lock_type = map_manual_lock_type(request.existing_lock)
+    door_standard = map_manual_door_standard(request.existing_lock)
+    thickness_class = map_thickness_class(request.door_thickness_mm)
+
+    return DoorProfile(
+        visual_description=f"Manual entry: {request.existing_lock} lock reported on a {request.door_material} door.",
+        door_material=map_manual_door_material(request.door_material),
+        material_confidence=1.0,
+        door_style=request.door_type,
+        lock=LockObs(
+            detected=True,
+            confidence=1.0,
+            visual_evidence=f"Manual selection: {request.existing_lock}",
+            lock_type=lock_type,
+            cylinder_visible=lock_type in [LockType.EURO_CYLINDER, LockType.RIM_CYLINDER],
+            deadbolt_present=lock_type in [
+                LockType.MECHANICAL_DEADBOLT,
+                LockType.INTERCONNECTED_DEADBOLT,
+                LockType.RIM_CYLINDER,
+            ],
+        ),
+        door_standard=door_standard,
+        door_standard_confidence=1.0,
+        handing=Handing.UNKNOWN,
+        handing_confidence=1.0,
+        approx_thickness_class=thickness_class,
+        stile_width_class=StileWidthClass.UNKNOWN,
+        frame=ComponentObs(
+            detected=True,
+            confidence=1.0,
+            visual_evidence=f"Manual selection: {request.frame_type}",
+        ),
+        handle=ComponentObs(
+            detected=False,
+            confidence=1.0,
+            visual_evidence="Handle details were not provided in manual flow.",
+        ),
+        measured_thickness_mm=request.door_thickness_mm,
+        measured_backset_mm=request.backset_mm,
+        measured_center_to_center_mm=request.center_to_center_mm,
+    )
+
+
+# =========================================================
+# Manual lock mapping
+# =========================================================
+
+def map_manual_lock_type(value: str) -> LockType:
+    normalized = value.strip().lower().replace("-", "_")
+
+    if "interconnected" in normalized:
+        return LockType.INTERCONNECTED_DEADBOLT
+
+    if "surface" in normalized or "rim" in normalized or "night latch" in normalized:
+        return LockType.RIM_CYLINDER
+
+    if "deadbolt" in normalized:
+        return LockType.MECHANICAL_DEADBOLT
+
+    if "euro" in normalized:
+        return LockType.EURO_CYLINDER
+
+    if "tubular" in normalized:
+        return LockType.TUBULAR_LATCH
+
+    if "passage" in normalized:
+        return LockType.NO_LOCK_PASSAGE
+
+    if "keyhole" in normalized:
+        return LockType.MORTISE_KEYHOLE
+
+    if "mortise" in normalized:
+        return LockType.MORTISE
+
+    if "cylindrical" in normalized or "knob" in normalized:
+        return LockType.CYLINDRICAL_KNOB
+
+    if "lever" in normalized:
+        return LockType.TUBULAR_LATCH
+
+    return LockType.UNKNOWN
+
+
+# =========================================================
+# Manual door standard mapping
+# =========================================================
+
+def map_manual_door_standard(existing_lock: str) -> DoorStandard:
+    normalized = existing_lock.strip().lower()
+
+    if "interconnected" in normalized:
+        return DoorStandard.US_INTERCONNECTED
+
+    if "surface" in normalized or "rim" in normalized or "night latch" in normalized:
+        return DoorStandard.SURFACE_RIM_LOCK
+
+    if "deadbolt" in normalized:
+        return DoorStandard.US_DEADBOLT
+
+    if "euro" in normalized:
+        return DoorStandard.EURO_PROFILE
+
+    if "ansi" in normalized:
+        return DoorStandard.ANSI
+
+    if (
+        "cylindrical" in normalized
+        or "knob" in normalized
+        or "lever" in normalized
+        or "tubular" in normalized
+    ):
+        return DoorStandard.CYLINDRICAL_KNOB_OR_LEVER
+
+    if "passage" in normalized:
+        return DoorStandard.PASSAGE_LATCH_EURO
+
+    if "mortise" in normalized:
+        return DoorStandard.EURO_PROFILE
+
+    return DoorStandard.UNKNOWN
+
+
+# =========================================================
+# Manual door material mapping
+# =========================================================
+
+def map_manual_door_material(value: str) -> DoorMaterial:
+    normalized = value.strip().lower()
+
+    if "wood" in normalized or "timber" in normalized or "laminate" in normalized:
+        return DoorMaterial.WOOD
+
+    if "glass" in normalized:
+        return DoorMaterial.GLASS
+
+    if "metal" in normalized or "steel" in normalized or "aluminium" in normalized or "aluminum" in normalized:
+        return DoorMaterial.METAL
+
+    return DoorMaterial.UNKNOWN
+
+
+# =========================================================
+# Thickness classification
+# =========================================================
+
+def map_thickness_class(thickness_mm: float) -> ThicknessClass:
+    if thickness_mm < 35:
+        return ThicknessClass.THIN_UNDER_35MM
+
+    if thickness_mm <= 55:
+        return ThicknessClass.STANDARD_35_55MM
+
+    if thickness_mm <= 85:
+        return ThicknessClass.THICK_55_85MM
+
+    return ThicknessClass.OVER_85MM
 
 
 # =========================================================

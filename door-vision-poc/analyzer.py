@@ -22,11 +22,68 @@ ollama_client = Client(host=OLLAMA_HOST)
 
 
 SALTO_VISION_PROMPT = """You are a senior access control surveyor for Salto Systems.
-Inspect the multi-angle photos of the door and classify it into EXACTLY ONE of the
-6 hardware categories below. Each category is an ATOMIC bundle: door_standard,
-lock_type, cylinder_visible and deadbolt_present must ALL come from the SAME
-category. Never mix a door_standard from one category with a lock_type from
-another — that combination is always wrong.
+Inspect the multi-angle photos of the door. You will fill in `lock` (with
+lock_type, cylinder_visible, deadbolt_present) BEFORE door_standard. Once you
+have written lock_type, door_standard MUST be the matching door_standard from
+the SAME numbered category below — never a different category's value.
+
+LOCK HARDWARE REFERENCE — READ CAREFULLY BEFORE CLASSIFYING:
+
+A door's lock hardware is made of a few universal parts. Learn these first,
+then use them to reason about what you see — do not just pattern-match a
+category name.
+
+- HANDLE: either a KNOB (round, you twist it) or a LEVER (a bar you push
+  down). This alone tells you nothing about whether the door is locked —
+  many doors have a handle with no lock at all.
+- LATCH: a spring-loaded angled bolt that clicks shut automatically when
+  the door closes. Operated by turning the handle. Cannot be locked with a
+  key by itself.
+- DEADBOLT: a square-ended bolt that only moves when you turn a key or a
+  thumb-turn — it does NOT retract just by pushing the door. This is what
+  actually secures a door. If you see a bolt that looks flat/square-edged
+  (not angled like a latch), that is a deadbolt.
+- CYLINDER: the part that accepts a key. It comes in different physical
+  shapes depending on lock family:
+    - Euro/DIN profile cylinder: a small cylinder, roughly the width of two
+      fingers, with a figure-8/teardrop cross-section. It passes THROUGH the
+      door edge horizontally, so you see a short stub (a few mm) sticking
+      out of a round hole on each face, usually mounted in its own small
+      plate near a lever handle, OR within the lever's own backplate.
+    - Rim cylinder: round, used in surface-mounted lock boxes.
+    - Mortise/pin-tumbler cylinder: round, screws into a lock body, may sit
+      inside a larger decorative escutcheon plate.
+    - Key-in-knob/lever cylinder: built directly into the center of the
+      knob or lever itself — no separate visible cylinder anywhere else.
+- FACEPLATE: the metal plate on the door EDGE (the thin side) where the
+  latch/bolt/cylinder mounts.
+- ESCUTCHEON/BACKPLATE: the plate on the FACE of the door, around the
+  handle and/or cylinder.
+- STRIKE PLATE: the metal plate on the door FRAME (not the door itself)
+  where the latch/bolt lands when the door closes.
+
+SCAN CHECKLIST — DO THIS BEFORE CONCLUDING "NO LOCK":
+Before you ever choose category 6 (no lock), explicitly check the whole
+door for: (1) any round or oval shape that could be a cylinder or keyway,
+even if partially obscured by shadow or at low resolution, (2) any raised
+paddle or knob separate from the main handle (a thumb-turn), (3) any bolt
+protruding from the door edge. A door with just a knob or lever CAN still
+have a lock built into that same knob/lever — check its center/base for a
+keyway before assuming there is none. Only conclude "no lock" if none of
+these are present anywhere on the door.
+
+FIRST, fill in `visual_description` with 2-4 plain sentences describing exactly
+what you can see: handle shape (knob/lever/none), anything round or cylindrical
+and whether it actually protrudes out of the door, any bolts or throw
+mechanisms, faceplate holes and what's actually in them, and any legible brand
+text. Write only what you can actually see — do not mention a cylinder,
+bolt, or feature unless it is visibly there.
+
+ONLY AFTER writing that description, choose exactly ONE of the 6 categories
+below. Your door_standard/lock_type/cylinder_visible/deadbolt_present answers
+MUST be consistent with what you wrote in visual_description — if your own
+description doesn't mention a cylinder protruding from the door, you cannot
+then choose "euro_profile".
 
 1. Euro cylinder:
    EITHER: a distinct cylindrical metal body — with a visible keyway slot or
@@ -109,6 +166,14 @@ BRAND TEXT:
 If any brand name or logo is legibly embossed or printed on the lock, handle,
 or cylinder, transcribe it exactly as written into visual_evidence. Never
 guess a brand name you cannot actually read.
+
+FIELD DISCIPLINE:
+frame.visual_evidence must describe ONLY the door frame material/condition
+(e.g. "wood frame", "metal frame, no visible hardware"). handle.visual_evidence
+must describe ONLY the handle itself (e.g. "brass doorknob", "black lever").
+NEVER copy lock_type, door_standard, or any other field's value into these —
+if you are unsure, write "not clearly visible" instead of reusing another
+field's answer.
 """
 
 
@@ -242,6 +307,11 @@ def analyze_door_for_salto(image_paths: List[str]) -> DoorProfile:
         print("\n" + "-" * 70, flush=True)
         print("[VISION] EXTRACTED DOOR PROFILE", flush=True)
         print("-" * 70, flush=True)
+
+        print(
+            f"[VISION] visual_description  = {result.visual_description}",
+            flush=True,
+        )
 
         print(
             f"[VISION] door_standard      = {result.door_standard}",

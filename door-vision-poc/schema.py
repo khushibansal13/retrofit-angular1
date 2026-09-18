@@ -59,16 +59,22 @@ class LockObs(ComponentObs):
     deadbolt_present: bool
 
 class DoorProfile(BaseModel):
+    visual_description: str
     door_material: DoorMaterial
     material_confidence: float = Field(..., ge=0.0, le=1.0)
     door_style: str
+
+    # lock MUST come before door_standard: Ollama generates JSON fields in
+    # this exact declared order, so door_standard can only be made
+    # consistent with lock_type if lock_type is written first.
+    lock: LockObs
+
     door_standard: DoorStandard
     door_standard_confidence: float = Field(..., ge=0.0, le=1.0)
     handing: Handing
     handing_confidence: float = Field(..., ge=0.0, le=1.0)
     approx_thickness_class: ThicknessClass
     stile_width_class: StileWidthClass
-    lock: LockObs
     frame: ComponentObs
     handle: ComponentObs
 
