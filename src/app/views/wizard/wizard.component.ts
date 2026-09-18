@@ -1528,14 +1528,6 @@ export class WizardComponent
   }
 
   finishWizard(): void {
-    if (
-      !this.selectedProduct ||
-      !this.fit ||
-      !this.config.gdprAccepted ||
-      this.quantity < 1
-    ) {
-      return;
-    }
 
     if (this.selectedFiles.length > 0 && !this.arSession.hasCustomDoorImage()) {
       this.arSession.setDoorImage(this.selectedFiles[0]);
