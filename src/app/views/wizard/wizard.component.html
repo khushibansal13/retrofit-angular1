@@ -316,6 +316,25 @@
             <div class="detected-card"><mat-icon>texture</mat-icon><div><strong>{{ detectedProfile?.material }}</strong><span>Door material · {{ detectedProfile?.materialConf }}% confidence</span></div></div>
             <div class="detected-card"><mat-icon>door_front</mat-icon><div><strong>{{ detectedProfile?.doorStyle }}</strong><span>Door style · {{ detectedProfile?.styleConf }}% confidence</span></div></div>
             <div class="detected-card"><mat-icon>lock</mat-icon><div><strong>{{ detectedProfile?.existingLock }}</strong><span>Existing lock · {{ detectedProfile?.lockConf }}% confidence</span></div></div>
+            <div class="detected-card">
+  <mat-icon>rule_folder</mat-icon>
+  <div>
+    <strong>{{ detectedProfile?.doorStandard }}</strong>
+    <span>Door standard · {{ detectedProfile?.doorStandardConf }}% confidence</span>
+  </div>
+</div>
+
+<div class="detected-card">
+  <mat-icon>key</mat-icon>
+  <div>
+    <strong>{{ detectedProfile?.lockType }}</strong>
+    <span>
+      Lock hardware ·
+      {{ detectedProfile?.cylinderVisible ? 'Cylinder visible' : 'No visible cylinder' }}
+      · {{ detectedProfile?.deadboltPresent ? 'Deadbolt present' : 'No deadbolt' }}
+    </span>
+  </div>
+</div>
             <div class="detected-card"><mat-icon>compare_arrows</mat-icon><div><strong>{{ detectedProfile?.handing }}</strong><span>Handing · {{ detectedProfile?.handingConf }}% confidence</span></div></div>
             @if (detectedProfile?.stileWidth) {
               <div class="detected-card"><mat-icon>straighten</mat-icon><div><strong>{{ detectedProfile?.stileWidth }}</strong><span>Stile width</span></div></div>

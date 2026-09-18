@@ -62,6 +62,12 @@ interface DetectedProfile {
   handleType: string;
   backsetMm: number | null;
   centerToCenterMm: number | null;
+  doorStandard: string;
+  doorStandardConf: number;
+  lockType: string;
+  cylinderVisible: boolean;
+  deadboltPresent: boolean;
+  thicknessClass: string;
 }
 
 interface LockTypeOption {
@@ -1052,6 +1058,32 @@ export class WizardComponent
 
       backsetMm: result.profile.measured_backset_mm,
       centerToCenterMm: result.profile.measured_center_to_center_mm,
+
+        doorStandard:
+        this.formatValue(
+          result.profile.door_standard,
+        ),
+
+      doorStandardConf:
+        this.toPercent(
+          result.profile.door_standard_confidence,
+        ),
+
+      lockType:
+        this.formatValue(
+          result.profile.lock.lock_type,
+        ),
+
+      cylinderVisible:
+        result.profile.lock.cylinder_visible,
+
+      deadboltPresent:
+        result.profile.lock.deadbolt_present,
+
+      thicknessClass:
+        this.formatValue(
+          result.profile.approx_thickness_class,
+        ),
     };
 
     const existingLockId =
