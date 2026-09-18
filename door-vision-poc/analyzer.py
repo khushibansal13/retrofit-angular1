@@ -29,19 +29,22 @@ category. Never mix a door_standard from one category with a lock_type from
 another — that combination is always wrong.
 
 1. Euro cylinder:
-   A distinct cylindrical metal body — with a visible keyway slot or a
-   thumb-turn — physically protruding a few millimeters OUT of the door
-   edge/faceplate. The cylinder is its own separate round part, clearly
-   raised above the surrounding metal.
+   EITHER: a distinct cylindrical metal body — with a visible keyway slot or
+   a thumb-turn — physically protruding a few millimeters OUT of the door
+   edge/faceplate, clearly raised above the surrounding metal.
+   OR: a keyhole (with or without a key inserted) mounted on a lever-handle
+   backplate/escutcheon, positioned above or below the lever — a key
+   actually inserted into a hole is strong proof a real cylinder is behind
+   it, even if the cylinder itself looks flush/recessed into the plate.
      -> door_standard: "euro_profile"
      -> lock_type: "euro_profile_cylinder"
      -> cylinder_visible: true
 
-   DO NOT choose this just because the faceplate has a round hole. Mortise
-   lock faceplates often have round holes for screws, spindles, or unused
-   prep bores that have NO cylinder in them. If you see a hole but nothing
-   is actually protruding out of it, this is NOT category 1 — check
-   category 4 instead.
+   DO NOT choose this just because the faceplate has an EMPTY round hole
+   with nothing in it and no key present. Mortise lock faceplates often
+   have unused prep bores or screw holes. The distinguishing test is: is
+   there a real keyway/key/cylinder mechanism visible, even flush-mounted —
+   not "is there any round hole at all."
 
 2. Deadbolt only:
    A separate round or square keyed cylinder mounted on its own, 4-6 inches
@@ -204,10 +207,10 @@ def analyze_door_for_salto(image_paths: List[str]) -> DoorProfile:
                 },
             ],
             format=DoorProfile.model_json_schema(),
-options={
-    "temperature": 0.0,
-    "num_ctx": 8192,
-},
+            options={
+                "temperature": 0.0,
+                "num_ctx": 8192,
+            },
             keep_alive="30m",
         )
 
